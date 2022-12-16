@@ -1,4 +1,4 @@
-use bevy::{prelude::*, asset::{AssetLoader, LoadedAsset, Asset, load_internal_asset}, render::{view::{ExtractedView, VisibleEntities, ViewDepthTexture, ViewTarget, ViewUniforms, ViewUniformOffset}, render_phase::{RenderPhase, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::{RenderPipelineId, Buffer, BufferUsages, BufferInitDescriptor, RenderPassDescriptor, Operations, LoadOp, RenderPassDepthStencilAttachment, RawVertexBufferLayout, VertexBufferLayout, VertexStepMode, VertexAttribute, VertexFormat, BindGroupDescriptor, BindGroupEntry, BindGroup, ShaderStage}, render_asset::{RenderAsset, RenderAssetPlugin, PrepareAssetLabel, RenderAssets}, render_graph::{SlotInfo, SlotType, RenderGraph}, camera::ExtractedCamera, extract_component::{ExtractComponent, ExtractComponentPlugin}, RenderApp, RenderStage}, core_pipeline::{core_3d::{Opaque3d, MainPass3dNode}, clear_color::ClearColorConfig}, ecs::system::{lifetimeless::SRes, SystemParamItem}, core::cast_slice};
+use bevy::{prelude::*, asset::{AssetLoader, LoadedAsset, Asset, load_internal_asset}, render::{view::{ExtractedView, VisibleEntities, ViewDepthTexture, ViewTarget, ViewUniforms, ViewUniformOffset}, render_phase::{RenderPhase, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::{RenderPipelineId, Buffer, BufferUsages, BufferInitDescriptor, RenderPassDescriptor, Operations, LoadOp, RenderPassDepthStencilAttachment, RawVertexBufferLayout, VertexBufferLayout, VertexStepMode, VertexAttribute, VertexFormat, BindGroupDescriptor, BindGroupEntry, BindGroup, ShaderStage}, render_asset::{RenderAsset, RenderAssetPlugin, PrepareAssetLabel, RenderAssets}, render_graph::{SlotInfo, SlotType, RenderGraph}, camera::ExtractedCamera, extract_component::{ExtractComponent, ExtractComponentPlugin}, RenderApp, RenderStage, mesh::MeshVertexAttribute}, core_pipeline::{core_3d::{Opaque3d, MainPass3dNode}, clear_color::ClearColorConfig}, ecs::system::{lifetimeless::SRes, SystemParamItem}, core::cast_slice};
 use las::Read;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy::render::render_resource::{SamplerBindingType, TextureSampleType, TextureViewDimension};
@@ -49,6 +49,8 @@ impl Point {
     }
 }
 
+pub const ATTRIBUTE_COLOR: MeshVertexAttribute =
+MeshVertexAttribute::new("Vertex_Color", 1, VertexFormat::Float32x3);
 impl AssetLoader for LasLoader {
     fn load<'a>(
             &'a self,
@@ -61,12 +63,18 @@ impl AssetLoader for LasLoader {
             let mut mesh = Mesh::new(PrimitiveTopology::PointList);
             let mut max: Point = [f32::MIN; 3].into();
             let mut min: Point = [f32::MAX; 3].into();
-            let mut positions = reader.points().take(100000).map(|a| {
+            let mut positions = reader.points().take(500000).map(|a| {
                 let p = a.unwrap();
                 let p: Point = [p.x as f32, p.y as f32, p.z as f32].into();
                 min = min.min(&p);
                 max = max.max(&p);
                 p.inner
+            }).collect::<Vec<_>>();
+
+            let colors = reader.points().take(500000).map(|a| {
+                let p = a.unwrap();
+                let intensity = p.intensity as f32 * 0.001;
+                [intensity, intensity, intensity]
             }).collect::<Vec<_>>();
 
             let aabb = [max.inner[0] - min.inner[0], max.inner[1] - min.inner[1], max.inner[2] - min.inner[2]];
@@ -80,6 +88,7 @@ impl AssetLoader for LasLoader {
                 i[2] /= scale;
             }
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+            mesh.insert_attribute(ATTRIBUTE_COLOR, colors);
             println!("Loaded asset, max {:?}, min {:?}", max.inner, min.inner);
             let asset = PointCloudAsset { mesh };
             load_context.set_default_asset(LoadedAsset::new(asset));
@@ -321,7 +330,6 @@ impl Node for PointCloudNode {
             let point_cloud_asset = point_cloud_asset.unwrap();
             render_pass.set_vertex_buffer(0, *point_cloud_asset.buffer.slice(..));
             render_pass.draw(0..point_cloud_asset.num_points, 0..1);
-            println!("Drawed one");
         }
 
         Ok(())
@@ -395,12 +403,16 @@ impl FromWorld for PointCloudPipeline {
                 shader_defs: Default::default(),
                 entry_point: "main".into(),
                 buffers: vec![VertexBufferLayout {
-                    array_stride: 12,
+                    array_stride: 24,
                     step_mode: VertexStepMode::Vertex,
                     attributes: vec![VertexAttribute {
                         format: VertexFormat::Float32x3,
                         offset: 0,
                         shader_location: 0,
+                    }, VertexAttribute {
+                        format: VertexFormat::Float32x3,
+                        offset: 12,
+                        shader_location: 1,
                     }],
                 }
                 ],
