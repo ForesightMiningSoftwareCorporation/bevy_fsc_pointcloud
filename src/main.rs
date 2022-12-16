@@ -1,4 +1,4 @@
-use bevy::{prelude::*, asset::{AssetLoader, LoadedAsset, Asset, load_internal_asset}, render::{view::{ExtractedView, VisibleEntities, ViewDepthTexture, ViewTarget, ViewUniforms}, render_phase::{RenderPhase, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::{RenderPipelineId, Buffer, BufferUsages, BufferInitDescriptor, RenderPassDescriptor, Operations, LoadOp, RenderPassDepthStencilAttachment, RawVertexBufferLayout, VertexBufferLayout, VertexStepMode, VertexAttribute, VertexFormat, BindGroupDescriptor, BindGroupEntry, BindGroup, ShaderStage}, render_asset::{RenderAsset, RenderAssetPlugin, PrepareAssetLabel, RenderAssets}, render_graph::{SlotInfo, SlotType, RenderGraph}, camera::ExtractedCamera, extract_component::{ExtractComponent, ExtractComponentPlugin}, RenderApp, RenderStage}, core_pipeline::{core_3d::{Opaque3d, MainPass3dNode}, clear_color::ClearColorConfig}, ecs::system::{lifetimeless::SRes, SystemParamItem}, core::cast_slice};
+use bevy::{prelude::*, asset::{AssetLoader, LoadedAsset, Asset, load_internal_asset}, render::{view::{ExtractedView, VisibleEntities, ViewDepthTexture, ViewTarget, ViewUniforms, ViewUniformOffset}, render_phase::{RenderPhase, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::{RenderPipelineId, Buffer, BufferUsages, BufferInitDescriptor, RenderPassDescriptor, Operations, LoadOp, RenderPassDepthStencilAttachment, RawVertexBufferLayout, VertexBufferLayout, VertexStepMode, VertexAttribute, VertexFormat, BindGroupDescriptor, BindGroupEntry, BindGroup, ShaderStage}, render_asset::{RenderAsset, RenderAssetPlugin, PrepareAssetLabel, RenderAssets}, render_graph::{SlotInfo, SlotType, RenderGraph}, camera::ExtractedCamera, extract_component::{ExtractComponent, ExtractComponentPlugin}, RenderApp, RenderStage}, core_pipeline::{core_3d::{Opaque3d, MainPass3dNode}, clear_color::ClearColorConfig}, ecs::system::{lifetimeless::SRes, SystemParamItem}, core::cast_slice};
 use las::Read;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy::render::render_resource::{SamplerBindingType, TextureSampleType, TextureViewDimension};
@@ -23,6 +23,32 @@ use smooth_bevy_cameras::{controllers::fps::*, LookTransformPlugin};
 
 struct LasLoader;
 
+#[repr(transparent)]
+struct Point {
+    inner: [f32; 3]
+}
+impl From<[f32; 3]> for Point {
+    fn from(inner: [f32; 3]) -> Self {
+        Self { inner }
+    }
+}
+impl Point {
+    pub fn min(&self, other: &Self) -> Self {
+        Point{inner: [
+            self.inner[0].min(other.inner[0]),
+            self.inner[1].min(other.inner[1]),
+            self.inner[2].min(other.inner[2]),
+        ]}
+    }
+    pub fn max(&self, other: &Self) -> Self {
+        Point{inner: [
+            self.inner[0].max(other.inner[0]),
+            self.inner[1].max(other.inner[1]),
+            self.inner[2].max(other.inner[2]),
+        ]}
+    }
+}
+
 impl AssetLoader for LasLoader {
     fn load<'a>(
             &'a self,
@@ -31,19 +57,30 @@ impl AssetLoader for LasLoader {
         ) -> bevy::utils::BoxedFuture<'a, Result<(), bevy::asset::Error>> {
         Box::pin(async move {
             let mut reader = las::Reader::new(std::io::Cursor::new(bytes)).expect("Unable to open reader");
-            let npoints = reader
-                .points()
-                .map(|p| p.expect("Unable to read point"))
-                .count();
-            println!("Number of points: {}", npoints);
             println!("headers: {:?}", reader.header());
             let mut mesh = Mesh::new(PrimitiveTopology::PointList);
-            let positions = reader.points().map(|a| {
+            let mut max: Point = [f32::MIN; 3].into();
+            let mut min: Point = [f32::MAX; 3].into();
+            let mut positions = reader.points().take(100000).map(|a| {
                 let p = a.unwrap();
-                [p.x as f32, p.y as f32, p.z as f32]
+                let p: Point = [p.x as f32, p.y as f32, p.z as f32].into();
+                min = min.min(&p);
+                max = max.max(&p);
+                p.inner
             }).collect::<Vec<_>>();
+
+            let aabb = [max.inner[0] - min.inner[0], max.inner[1] - min.inner[1], max.inner[2] - min.inner[2]];
+            let scale = aabb[0].max(aabb[1]).max(aabb[2]);
+            for i in positions.iter_mut() {
+                i[0] -= min.inner[0];
+                i[1] -= min.inner[1];
+                i[2] -= min.inner[2];
+                i[0] /= scale;
+                i[1] /= scale;
+                i[2] /= scale;
+            }
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-            println!("Loaded asset");
+            println!("Loaded asset, max {:?}, min {:?}", max.inner, min.inner);
             let asset = PointCloudAsset { mesh };
             load_context.set_default_asset(LoadedAsset::new(asset));
             Ok(())
@@ -140,7 +177,7 @@ fn main() {
     let draw_3d_graph = render_graph.get_sub_graph_mut(bevy::core_pipeline::core_3d::graph::NAME).unwrap();
     
     draw_3d_graph.add_node(PointCloudNode::NAME, point_cloud_node);
-    draw_3d_graph.add_node_edge(PointCloudNode::NAME, bevy::core_pipeline::core_3d::graph::node::MAIN_PASS);
+    draw_3d_graph.add_node_edge(bevy::core_pipeline::core_3d::graph::node::MAIN_PASS, PointCloudNode::NAME);
     draw_3d_graph.add_slot_edge(
         draw_3d_graph.input_node().id,
         bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
@@ -174,7 +211,7 @@ fn startup(
             translate_sensitivity: 2.0,
             ..Default::default()
         },
-        Vec3::new(50.0, 20.0, 0.0),
+        Vec3::new(5.0, 2.0, 0.0),
         Vec3::new(0.0, 0.0, 0.0),
     ));
 }
@@ -187,6 +224,7 @@ pub struct PointCloudNode {
             &'static Camera3d,
             &'static ViewTarget,
             &'static ViewDepthTexture,
+            &'static ViewUniformOffset
         ),
         With<ExtractedView>,
     >,
@@ -228,7 +266,7 @@ impl Node for PointCloudNode {
         world: &World,
     ) -> Result<(), bevy::render::render_graph::NodeRunError> {
         let view_entity = graph.get_input_entity(Self::IN_VIEW)?;
-        let (camera, view, camera_3d, target, depth) =
+        let (camera, view, camera_3d, target, depth, view_uniform_offset) =
             match self.query.get_manual(world, view_entity) {
                 Ok(query) => query,
                 Err(_) => {
@@ -271,7 +309,7 @@ impl Node for PointCloudNode {
             println!("No bind group");
             return Ok(());
         }
-        render_pass.set_bind_group(0, &bind_groups.bind_group.as_ref().unwrap(), &[]);
+        render_pass.set_bind_group(0, &bind_groups.bind_group.as_ref().unwrap(), &[view_uniform_offset.offset]);
         //render_pass.set_push_constants(ShaderStages::VERTEX | ShaderStages::FRAGMENT, 0, data)
 
         let render_assets = world.resource::<RenderAssets<PointCloudAsset>>();
@@ -342,7 +380,7 @@ impl FromWorld for PointCloudPipeline {
                 BindGroupLayoutEntry {
                     binding: 0,
                     visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer { ty: BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+                    ty: BindingType::Buffer { ty: BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: None },
                     count: None
                 }
             ],
