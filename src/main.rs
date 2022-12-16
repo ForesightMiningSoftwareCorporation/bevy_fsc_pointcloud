@@ -319,7 +319,6 @@ impl Node for PointCloudNode {
             return Ok(());
         }
         render_pass.set_bind_group(0, &bind_groups.bind_group.as_ref().unwrap(), &[view_uniform_offset.offset]);
-        //render_pass.set_push_constants(ShaderStages::VERTEX | ShaderStages::FRAGMENT, 0, data)
 
         let render_assets = world.resource::<RenderAssets<PointCloudAsset>>();
         for (point_cloud, ) in self.entity_query.iter_manual(&world) {
