@@ -1,4 +1,4 @@
-use bevy::{prelude::*, asset::{AssetLoader, LoadedAsset, Asset, load_internal_asset}, render::{view::{ExtractedView, VisibleEntities, ViewDepthTexture, ViewTarget, ViewUniforms, ViewUniformOffset}, render_phase::{RenderPhase, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::{RenderPipelineId, Buffer, BufferUsages, BufferInitDescriptor, RenderPassDescriptor, Operations, LoadOp, RenderPassDepthStencilAttachment, RawVertexBufferLayout, VertexBufferLayout, VertexStepMode, VertexAttribute, VertexFormat, BindGroupDescriptor, BindGroupEntry, BindGroup, ShaderStage}, render_asset::{RenderAsset, RenderAssetPlugin, PrepareAssetLabel, RenderAssets}, render_graph::{SlotInfo, SlotType, RenderGraph}, camera::ExtractedCamera, extract_component::{ExtractComponent, ExtractComponentPlugin}, RenderApp, RenderStage, mesh::MeshVertexAttribute}, core_pipeline::{core_3d::{Opaque3d, MainPass3dNode}, clear_color::ClearColorConfig}, ecs::system::{lifetimeless::SRes, SystemParamItem}, core::cast_slice};
+use bevy::{prelude::*, asset::{AssetLoader, LoadedAsset, Asset, load_internal_asset}, render::{view::{ExtractedView, VisibleEntities, ViewDepthTexture, ViewTarget, ViewUniforms, ViewUniformOffset}, render_phase::{RenderPhase, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::{RenderPipelineId, Buffer, BufferUsages, BufferInitDescriptor, RenderPassDescriptor, Operations, LoadOp, RenderPassDepthStencilAttachment, RawVertexBufferLayout, VertexBufferLayout, VertexStepMode, VertexAttribute, VertexFormat, BindGroupDescriptor, BindGroupEntry, BindGroup, ShaderStage, CachedComputePipelineId, ComputePipelineDescriptor, StorageTextureAccess, Texture, TextureView, TextureDescriptor, TextureDimension, TextureUsages, Extent3d, AsBindGroupShaderType, RenderPassColorAttachment, ComputePassDescriptor, Sampler, SamplerDescriptor}, render_asset::{RenderAsset, RenderAssetPlugin, PrepareAssetLabel, RenderAssets}, render_graph::{SlotInfo, SlotType, RenderGraph}, camera::ExtractedCamera, extract_component::{ExtractComponent, ExtractComponentPlugin}, RenderApp, RenderStage, mesh::MeshVertexAttribute, texture::TextureCache}, core_pipeline::{core_3d::{Opaque3d, MainPass3dNode}, clear_color::ClearColorConfig}, ecs::system::{lifetimeless::SRes, SystemParamItem}, core::cast_slice, utils::HashMap};
 use las::Read;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy::render::render_resource::{SamplerBindingType, TextureSampleType, TextureViewDimension};
@@ -171,11 +171,13 @@ fn main() {
 
     load_internal_asset!(app, POINT_CLOUD_VERT_SHADER_HANDLE, "shader.vert", |s| Shader::from_glsl(s, ShaderStage::Vertex));
     load_internal_asset!(app, POINT_CLOUD_FRAG_SHADER_HANDLE, "shader.frag", |s| Shader::from_glsl(s, ShaderStage::Fragment));
+    load_internal_asset!(app, EYE_DOME_LIGHTING_SHADER_HANDLE, "eye-dome.wgsl", Shader::from_wgsl);
     let render_app = app.sub_app_mut(RenderApp);
 
 
     render_app
     .add_system_to_stage(RenderStage::Prepare, prepare_point_cloud_bind_group)
+    .add_system_to_stage(RenderStage::Queue, prepare_view_targets)
     .init_resource::<PointCloudBindGroup>()
     .init_resource::<PointCloudPipeline>();
     let point_cloud_node = PointCloudNode::new(&mut render_app.world);
@@ -228,12 +230,11 @@ fn startup(
 pub struct PointCloudNode {
     query: QueryState<
         (
-            &'static ExtractedCamera,
             &'static ExtractedView,
-            &'static Camera3d,
             &'static ViewTarget,
             &'static ViewDepthTexture,
-            &'static ViewUniformOffset
+            &'static ViewUniformOffset,
+            &'static EyeDomeViewTarget,
         ),
         With<ExtractedView>,
     >,
@@ -275,13 +276,14 @@ impl Node for PointCloudNode {
         world: &World,
     ) -> Result<(), bevy::render::render_graph::NodeRunError> {
         let view_entity = graph.get_input_entity(Self::IN_VIEW)?;
-        let (camera, view, camera_3d, target, depth, view_uniform_offset) =
+        let (view, target, depth, view_uniform_offset, eye_dome_view_target) =
             match self.query.get_manual(world, view_entity) {
                 Ok(query) => query,
                 Err(_) => {
                     return Ok(());
                 } // No window
             };
+        let mut color = Color::rgba(0.0, 0.0, 0.0, 0.0);
         let mut render_pass = render_context
             .command_encoder
             .begin_render_pass(&RenderPassDescriptor {
@@ -293,11 +295,11 @@ impl Node for PointCloudNode {
                     store: true,
                 }))],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: &depth.view,
+                    view: &eye_dome_view_target.depth_texture_view,
                     // NOTE: The opaque main pass loads the depth buffer and possibly overwrites it
                     depth_ops: Some(Operations {
                         // NOTE: 0.0 is the far plane due to bevy's use of reverse-z projections.
-                        load: LoadOp::Load,
+                        load: LoadOp::Clear(0.0),
                         store: true,
                     }),
                     stencil_ops: None,
@@ -307,11 +309,14 @@ impl Node for PointCloudNode {
         let point_cloud_pipeline = world.resource::<PointCloudPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline = pipeline_cache.get_render_pipeline(point_cloud_pipeline.pipeline_id);
-        if pipeline.is_none() {
+        let eye_dome_pipeline = pipeline_cache.get_compute_pipeline(point_cloud_pipeline.eye_dome_pipeline_id);
+        if pipeline.is_none() || eye_dome_pipeline.is_none() {
             println!("No pipeline");
             return Ok(());
         }
         let pipeline = pipeline.unwrap();
+        let eye_dome_pipeline = eye_dome_pipeline.unwrap();
+
         render_pass.set_pipeline(pipeline);
         let bind_groups = world.resource::<PointCloudBindGroup>();
         if bind_groups.bind_group.is_none() {
@@ -331,6 +336,14 @@ impl Node for PointCloudNode {
             render_pass.draw(0..point_cloud_asset.num_points, 0..1);
         }
 
+        drop(render_pass);
+        let mut render_pass = render_context.command_encoder.begin_compute_pass(&ComputePassDescriptor {
+            label: "Eye Dome Lighting".into()
+        });
+        render_pass.set_pipeline(eye_dome_pipeline);
+        render_pass.set_bind_group(0, &eye_dome_view_target.bind_group, &[]);
+        render_pass.dispatch_workgroups(view.viewport.z / 8, view.viewport.w / 8, 1);
+
         Ok(())
     }
 
@@ -344,12 +357,19 @@ pub(crate) const POINT_CLOUD_VERT_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf01);
 pub(crate) const POINT_CLOUD_FRAG_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf02);
+    pub(crate) const EYE_DOME_LIGHTING_SHADER_HANDLE: HandleUntyped =
+        HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf03);
 
 
 #[derive(Resource)]
 pub struct PointCloudPipeline {
     pub pipeline_id: CachedRenderPipelineId,
     pub view_layout: BindGroupLayout,
+
+    pub eye_dome_pipeline_id: CachedComputePipelineId,
+    pub eye_dome_image_layout: BindGroupLayout,
+
+    pub sampler: Sampler,
 }
 
 
@@ -381,6 +401,10 @@ fn prepare_point_cloud_bind_group(
 impl FromWorld for PointCloudPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
+        let sampler = render_device.create_sampler(&SamplerDescriptor {
+            label: "Eye Dome Shadingd Sampler".into(),
+            ..Default::default()
+        });
         let view_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("PointCloudViewLabel"),
             entries: &[
@@ -390,6 +414,29 @@ impl FromWorld for PointCloudPipeline {
                     ty: BindingType::Buffer { ty: BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: None },
                     count: None
                 }
+            ],
+        });
+        let eye_dome_image_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("EyeDomeImageLayout"),
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Texture { sample_type: TextureSampleType::Depth, view_dimension: TextureViewDimension::D2, multisampled: true },
+                    count: None
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::StorageTexture { access: StorageTextureAccess::ReadWrite, format: TextureFormat::Rgba8Unorm, view_dimension: TextureViewDimension::D2 },
+                    count: None
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Sampler(SamplerBindingType::NonFiltering),
+                    count: None
+                },
             ],
         });
         let pipeline_descriptor = RenderPipelineDescriptor {
@@ -421,7 +468,7 @@ impl FromWorld for PointCloudPipeline {
                 shader_defs: Default::default(),
                 entry_point: "main".into(),
                 targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::bevy_default(),
+                    format: TextureFormat::Rgba8Unorm,
                     blend: Some(BlendState::REPLACE),
                     write_mask: ColorWrites::ALL,
                 })],
@@ -458,16 +505,96 @@ impl FromWorld for PointCloudPipeline {
             },
         };
 
+        let eye_dome_compute_pipeline_descriptor = ComputePipelineDescriptor {
+            label: Some("EyeDomeLightingPipeline".into()),
+            layout: Some(vec![
+                eye_dome_image_layout.clone()
+            ]),
+            shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
+            shader_defs: Vec::new(),
+            entry_point: "main".into(),
+        };
+
         let mut pipeline_cache = world.resource_mut::<PipelineCache>();
         let pipeline_id = pipeline_cache.queue_render_pipeline(pipeline_descriptor);
-        println!("Pipeline queued");
+        let eye_dome_pipeline_id = pipeline_cache.queue_compute_pipeline(eye_dome_compute_pipeline_descriptor);
 
-        let layout = 
+
         Self {
             pipeline_id,
-            view_layout
-        };
-        layout
+            view_layout,
+            eye_dome_pipeline_id,
+            eye_dome_image_layout,
+            sampler
+        }
     }
 }
 
+
+#[derive(Clone, Component)]
+struct EyeDomeViewTarget {
+    depth_texture: Texture,
+    depth_texture_view: TextureView,
+    bind_group: BindGroup,
+}
+
+fn prepare_view_targets(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    mut texture_cache: ResMut<TextureCache>,
+    pipeline: Res<PointCloudPipeline>,
+    cameras: Query<(Entity, &ExtractedCamera, &ExtractedView, &ViewTarget)>,
+) {
+    let mut textures = HashMap::default();
+    for (entity, camera, view, view_target) in cameras.iter() {
+        if let Some(target_size) = camera.physical_target_size {
+            let size = Extent3d {
+                width: target_size.x,
+                height: target_size.y,
+                depth_or_array_layers: 1,
+            };
+
+            let main_textures = textures
+                .entry(camera.target.clone())
+                .or_insert_with(|| {
+                    let depth_descriptor = TextureDescriptor {
+                        label: None,
+                        size,
+                        mip_level_count: 1,
+                        sample_count: 4,
+                        dimension: TextureDimension::D2,
+                        format: TextureFormat::Depth32Float,
+                        usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+                    };
+                    let cached_depth_texture = texture_cache.get(&render_device, depth_descriptor);
+
+
+                    let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+                        label: "Eye Dome Bind Group".into(),
+                        layout: &pipeline.eye_dome_image_layout,
+                        entries: &[
+                            BindGroupEntry {
+                                binding: 0,
+                                resource: bevy::render::render_resource::BindingResource::TextureView(&cached_depth_texture.default_view),
+                            },
+                            BindGroupEntry {
+                                binding: 1,
+                                resource: bevy::render::render_resource::BindingResource::TextureView(&view_target.main_texture()),
+                            },
+                            BindGroupEntry {
+                                binding: 2,
+                                resource: bevy::render::render_resource::BindingResource::Sampler(&pipeline.sampler),
+                            },
+                        ],
+                    });
+                    EyeDomeViewTarget {
+                        depth_texture: cached_depth_texture.texture,
+                        depth_texture_view: cached_depth_texture.default_view,
+                        bind_group
+                    }
+                });
+
+            commands.entity(entity).insert(main_textures.clone());
+        }
+    }
+}
