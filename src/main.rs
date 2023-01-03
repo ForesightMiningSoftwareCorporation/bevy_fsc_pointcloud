@@ -1,4 +1,4 @@
-use bevy::{prelude::*, asset::{AssetLoader, LoadedAsset, Asset, load_internal_asset}, render::{view::{ExtractedView, VisibleEntities, ViewDepthTexture, ViewTarget, ViewUniforms, ViewUniformOffset}, render_phase::{RenderPhase, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::{RenderPipelineId, Buffer, BufferUsages, BufferInitDescriptor, RenderPassDescriptor, Operations, LoadOp, RenderPassDepthStencilAttachment, RawVertexBufferLayout, VertexBufferLayout, VertexStepMode, VertexAttribute, VertexFormat, BindGroupDescriptor, BindGroupEntry, BindGroup, ShaderStage, CachedComputePipelineId, ComputePipelineDescriptor, StorageTextureAccess, Texture, TextureView, TextureDescriptor, TextureDimension, TextureUsages, Extent3d, AsBindGroupShaderType, RenderPassColorAttachment, ComputePassDescriptor, Sampler, SamplerDescriptor}, render_asset::{RenderAsset, RenderAssetPlugin, PrepareAssetLabel, RenderAssets}, render_graph::{SlotInfo, SlotType, RenderGraph}, camera::ExtractedCamera, extract_component::{ExtractComponent, ExtractComponentPlugin}, RenderApp, RenderStage, mesh::MeshVertexAttribute, texture::TextureCache}, core_pipeline::{core_3d::{Opaque3d, MainPass3dNode}, clear_color::ClearColorConfig}, ecs::system::{lifetimeless::SRes, SystemParamItem}, core::cast_slice, utils::HashMap};
+use bevy::{prelude::*, asset::{AssetLoader, LoadedAsset, Asset, load_internal_asset}, render::{view::{ExtractedView, VisibleEntities, ViewDepthTexture, ViewTarget, ViewUniforms, ViewUniformOffset}, render_phase::{RenderPhase, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::{RenderPipelineId, Buffer, BufferUsages, BufferInitDescriptor, RenderPassDescriptor, Operations, LoadOp, RenderPassDepthStencilAttachment, RawVertexBufferLayout, VertexBufferLayout, VertexStepMode, VertexAttribute, VertexFormat, BindGroupDescriptor, BindGroupEntry, BindGroup, ShaderStage, CachedComputePipelineId, ComputePipelineDescriptor, StorageTextureAccess, Texture, TextureView, TextureDescriptor, TextureDimension, TextureUsages, Extent3d, AsBindGroupShaderType, RenderPassColorAttachment, ComputePassDescriptor, Sampler, SamplerDescriptor}, render_asset::{RenderAsset, RenderAssetPlugin, PrepareAssetLabel, RenderAssets}, render_graph::{SlotInfo, SlotType, RenderGraph}, camera::ExtractedCamera, extract_component::{ExtractComponent, ExtractComponentPlugin}, RenderApp, RenderStage, mesh::MeshVertexAttribute, texture::TextureCache}, core_pipeline::{core_3d::{Opaque3d, MainPass3dNode}, clear_color::ClearColorConfig}, ecs::system::{lifetimeless::SRes, SystemParamItem}, core::cast_slice, utils::HashMap, window::PresentMode};
 use las::Read;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy::render::render_resource::{SamplerBindingType, TextureSampleType, TextureViewDimension};
@@ -158,14 +158,20 @@ impl RenderAsset for PointCloudAsset {
 
 fn main() {
     let mut app = App::new();
-
+    // 192 fps
     app
-    .add_plugins(DefaultPlugins)
+    .add_plugins(DefaultPlugins.set(WindowPlugin {
+        window: WindowDescriptor {
+            present_mode: PresentMode::Immediate,
+            ..Default::default()
+        },
+        ..Default::default()
+    }))
     .add_asset::<PointCloudAsset>()
     .add_asset_loader(LasLoader)
     .add_startup_system(startup)
-    .add_plugin(LookTransformPlugin)
-    .add_plugin(FpsCameraPlugin::default())
+    //.add_plugin(LookTransformPlugin)
+    //.add_plugin(FpsCameraPlugin::default())
     .add_plugin(RenderAssetPlugin::<PointCloudAsset>::with_prepare_asset_label(PrepareAssetLabel::AssetPrepare))
     .add_plugin(ExtractComponentPlugin::<PotreePointCloud>::default());
 
@@ -215,16 +221,9 @@ fn startup(
     });
 
     commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(-20.0, 20.5, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(1.0, 1.5, 1.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
-    })        .insert(FpsCameraBundle::new(
-        FpsCameraController {
-            translate_sensitivity: 2.0,
-            ..Default::default()
-        },
-        Vec3::new(5.0, 2.0, 0.0),
-        Vec3::new(0.0, 0.0, 0.0),
-    ));
+    });;
 }
 
 pub struct PointCloudNode {
