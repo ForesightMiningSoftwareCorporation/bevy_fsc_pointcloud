@@ -1,7 +1,8 @@
 #version 450
 
 layout(location = 0) out vec4 o_Target;
-layout(location = 0) in vec4 in_Color;
+layout(location = 0) in float in_Color;
+layout(location = 1) in vec2 in_Point_Location;
 
 layout(set = 0, binding = 0) uniform View {
     mat4 view_proj;
@@ -16,9 +17,9 @@ layout(set = 0, binding = 0) uniform View {
 
 void main()
 {
-    vec2 uv = gl_PointCoord * 2.0 - 1.0;
+    vec2 uv = in_Point_Location * 2.0 - 1.0;
     float depth_offset = sqrt(uv.x * uv.x + uv.y * uv.y);
-    o_Target = in_Color;
+    o_Target = vec4(in_Color, in_Color, in_Color, 1.0);
 
 
     float depth = 1.0 / gl_FragCoord.w; // the world space depth

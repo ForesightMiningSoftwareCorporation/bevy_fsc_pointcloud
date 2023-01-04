@@ -1,4 +1,4 @@
-use bevy::{prelude::*, asset::{AssetLoader, LoadedAsset, Asset, load_internal_asset}, render::{view::{ExtractedView, VisibleEntities, ViewDepthTexture, ViewTarget, ViewUniforms, ViewUniformOffset}, render_phase::{RenderPhase, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::{RenderPipelineId, Buffer, BufferUsages, BufferInitDescriptor, RenderPassDescriptor, Operations, LoadOp, RenderPassDepthStencilAttachment, RawVertexBufferLayout, VertexBufferLayout, VertexStepMode, VertexAttribute, VertexFormat, BindGroupDescriptor, BindGroupEntry, BindGroup, ShaderStage, CachedComputePipelineId, ComputePipelineDescriptor, StorageTextureAccess, Texture, TextureView, TextureDescriptor, TextureDimension, TextureUsages, Extent3d, AsBindGroupShaderType, RenderPassColorAttachment, ComputePassDescriptor, Sampler, SamplerDescriptor}, render_asset::{RenderAsset, RenderAssetPlugin, PrepareAssetLabel, RenderAssets}, render_graph::{SlotInfo, SlotType, RenderGraph}, camera::ExtractedCamera, extract_component::{ExtractComponent, ExtractComponentPlugin}, RenderApp, RenderStage, mesh::MeshVertexAttribute, texture::TextureCache}, core_pipeline::{core_3d::{Opaque3d, MainPass3dNode}, clear_color::ClearColorConfig}, ecs::system::{lifetimeless::SRes, SystemParamItem}, core::cast_slice, utils::HashMap, window::PresentMode};
+use bevy::{prelude::*, asset::{AssetLoader, LoadedAsset, Asset, load_internal_asset}, render::{view::{ExtractedView, VisibleEntities, ViewDepthTexture, ViewTarget, ViewUniforms, ViewUniformOffset}, render_phase::{RenderPhase, DrawFunctions, PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::{RenderPipelineId, Buffer, BufferUsages, BufferInitDescriptor, RenderPassDescriptor, Operations, LoadOp, RenderPassDepthStencilAttachment, RawVertexBufferLayout, VertexBufferLayout, VertexStepMode, VertexAttribute, VertexFormat, BindGroupDescriptor, BindGroupEntry, BindGroup, ShaderStage, CachedComputePipelineId, ComputePipelineDescriptor, StorageTextureAccess, Texture, TextureView, TextureDescriptor, TextureDimension, TextureUsages, Extent3d, AsBindGroupShaderType, RenderPassColorAttachment, ComputePassDescriptor, Sampler, SamplerDescriptor, BufferBinding}, render_asset::{RenderAsset, RenderAssetPlugin, PrepareAssetLabel, RenderAssets}, render_graph::{SlotInfo, SlotType, RenderGraph}, camera::ExtractedCamera, extract_component::{ExtractComponent, ExtractComponentPlugin}, RenderApp, RenderStage, mesh::MeshVertexAttribute, texture::TextureCache}, core_pipeline::{core_3d::{Opaque3d, MainPass3dNode}, clear_color::ClearColorConfig}, ecs::system::{lifetimeless::SRes, SystemParamItem}, core::cast_slice, utils::HashMap, window::PresentMode};
 use las::Read;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy::render::render_resource::{SamplerBindingType, TextureSampleType, TextureViewDimension};
@@ -50,7 +50,7 @@ impl Point {
 }
 
 pub const ATTRIBUTE_COLOR: MeshVertexAttribute =
-MeshVertexAttribute::new("Vertex_Color", 1, VertexFormat::Float32x3);
+MeshVertexAttribute::new("Vertex_Color", 1, VertexFormat::Float32);
 impl AssetLoader for LasLoader {
     fn load<'a>(
             &'a self,
@@ -74,7 +74,7 @@ impl AssetLoader for LasLoader {
             let colors = reader.points().take(500000).map(|a| {
                 let p = a.unwrap();
                 let intensity = p.intensity as f32 * 0.001;
-                [intensity, intensity, intensity]
+                intensity
             }).collect::<Vec<_>>();
 
             let aabb = [max.inner[0] - min.inner[0], max.inner[1] - min.inner[1], max.inner[2] - min.inner[2]];
@@ -128,6 +128,7 @@ impl ExtractComponent for PotreePointCloud {
 struct PreparedPointCloudAsset {
     buffer: Buffer,
     num_points: u32,
+    bind_group: BindGroup,
 }
 
 impl RenderAsset for PointCloudAsset {
@@ -135,7 +136,7 @@ impl RenderAsset for PointCloudAsset {
 
     type PreparedAsset = PreparedPointCloudAsset;
 
-    type Param = SRes<RenderDevice>;
+    type Param = (SRes<RenderDevice>, SRes<PointCloudPipeline>);
 
     fn extract_asset(&self) -> Self::ExtractedAsset {
         println!("Extracted asset");
@@ -144,15 +145,28 @@ impl RenderAsset for PointCloudAsset {
 
     fn prepare_asset(
         extracted_asset: Self::ExtractedAsset,
-        render_device: &mut SystemParamItem<Self::Param>,
+        (render_device, pipeline): &mut SystemParamItem<Self::Param>,
     ) -> Result<Self::PreparedAsset, bevy::render::render_asset::PrepareAssetError<Self::ExtractedAsset>> {
         println!("Prepared asset");
         let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-            usage: BufferUsages::VERTEX,
+            usage: BufferUsages::STORAGE,
             label: Some("Point cloud vertex buffer"),
             contents: extracted_asset.mesh.get_vertex_buffer_data().as_slice()
         });
-        Ok(PreparedPointCloudAsset { buffer, num_points: extracted_asset.mesh.count_vertices() as u32 })
+        let bind_group = render_device.create_bind_group(&BindGroupDescriptor{
+            label: "point cloud buffer bind group".into(), layout: &pipeline.entity_layout, entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: bevy::render::render_resource::BindingResource::Buffer(BufferBinding {
+                        buffer: &buffer,
+                        offset: 0,
+                        size: None
+                    })
+                }
+            ]
+        }
+        );
+        Ok(PreparedPointCloudAsset { buffer, num_points: extracted_asset.mesh.count_vertices() as u32, bind_group })
     }
 }
 
@@ -223,7 +237,7 @@ fn startup(
     commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(1.0, 1.5, 1.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
-    });;
+    });
 }
 
 pub struct PointCloudNode {
@@ -323,7 +337,7 @@ impl Node for PointCloudNode {
             return Ok(());
         }
         render_pass.set_bind_group(0, &bind_groups.bind_group.as_ref().unwrap(), &[view_uniform_offset.offset]);
-
+        render_pass.set_vertex_buffer(0, *point_cloud_pipeline.instanced_point_quad.slice(0..32));
         let render_assets = world.resource::<RenderAssets<PointCloudAsset>>();
         for (point_cloud, ) in self.entity_query.iter_manual(&world) {
             let point_cloud_asset = render_assets.get(&point_cloud.mesh);
@@ -331,8 +345,9 @@ impl Node for PointCloudNode {
                 continue;
             }
             let point_cloud_asset = point_cloud_asset.unwrap();
-            render_pass.set_vertex_buffer(0, *point_cloud_asset.buffer.slice(..));
-            render_pass.draw(0..point_cloud_asset.num_points, 0..1);
+            render_pass.set_bind_group(1, &point_cloud_asset.bind_group, &[]);
+
+            render_pass.draw(0..4, 0..point_cloud_asset.num_points);
         }
 
         drop(render_pass);
@@ -364,11 +379,13 @@ pub(crate) const POINT_CLOUD_FRAG_SHADER_HANDLE: HandleUntyped =
 pub struct PointCloudPipeline {
     pub pipeline_id: CachedRenderPipelineId,
     pub view_layout: BindGroupLayout,
+    pub entity_layout: BindGroupLayout,
 
     pub eye_dome_pipeline_id: CachedComputePipelineId,
     pub eye_dome_image_layout: BindGroupLayout,
 
     pub sampler: Sampler,
+    pub instanced_point_quad: Buffer,
 }
 
 
@@ -397,9 +414,24 @@ fn prepare_point_cloud_bind_group(
     }
 }
 
+const QUAD_VERTEX_BUF: &'static [f32] = &[
+    0.0, 1.0,
+    0.0, 0.0,
+    1.0, 1.0,
+    1.0, 0.0
+];
+
+
 impl FromWorld for PointCloudPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
+        let instanced_point_quad = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            label: "instanced point quad".into(),
+            contents: unsafe {
+                std::slice::from_raw_parts(QUAD_VERTEX_BUF.as_ptr() as *const _, std::mem::size_of_val(QUAD_VERTEX_BUF))
+            },
+            usage: BufferUsages::VERTEX,
+        });
         let sampler = render_device.create_sampler(&SamplerDescriptor {
             label: "Eye Dome Shadingd Sampler".into(),
             ..Default::default()
@@ -411,6 +443,17 @@ impl FromWorld for PointCloudPipeline {
                     binding: 0,
                     visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
                     ty: BindingType::Buffer { ty: BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: None },
+                    count: None
+                }
+            ],
+        });
+        let entity_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("PointCloudViewLabel"),
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer { ty: BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None },
                     count: None
                 }
             ],
@@ -441,23 +484,20 @@ impl FromWorld for PointCloudPipeline {
         let pipeline_descriptor = RenderPipelineDescriptor {
             label: Some("point_cloud_pipeline".into()),
             layout: Some(vec![
-                view_layout.clone()
+                view_layout.clone(),
+                entity_layout.clone(),
             ]),
             vertex: VertexState {
                 shader: POINT_CLOUD_VERT_SHADER_HANDLE.typed(),
                 shader_defs: Default::default(),
                 entry_point: "main".into(),
                 buffers: vec![VertexBufferLayout {
-                    array_stride: 24,
+                    array_stride: 8,
                     step_mode: VertexStepMode::Vertex,
                     attributes: vec![VertexAttribute {
-                        format: VertexFormat::Float32x3,
+                        format: VertexFormat::Float32x2,
                         offset: 0,
                         shader_location: 0,
-                    }, VertexAttribute {
-                        format: VertexFormat::Float32x3,
-                        offset: 12,
-                        shader_location: 1,
                     }],
                 }
                 ],
@@ -476,9 +516,9 @@ impl FromWorld for PointCloudPipeline {
                 front_face: FrontFace::Ccw,
                 cull_mode: None,
                 unclipped_depth: false,
-                polygon_mode: PolygonMode::Point,
+                polygon_mode: PolygonMode::Fill,
                 conservative: false,
-                topology: PrimitiveTopology::PointList,
+                topology: PrimitiveTopology::TriangleStrip,
                 strip_index_format: None,
             },
             depth_stencil: Some(DepthStencilState {
@@ -518,13 +558,14 @@ impl FromWorld for PointCloudPipeline {
         let pipeline_id = pipeline_cache.queue_render_pipeline(pipeline_descriptor);
         let eye_dome_pipeline_id = pipeline_cache.queue_compute_pipeline(eye_dome_compute_pipeline_descriptor);
 
-
         Self {
             pipeline_id,
             view_layout,
+            entity_layout,
             eye_dome_pipeline_id,
             eye_dome_image_layout,
-            sampler
+            sampler,
+            instanced_point_quad
         }
     }
 }
