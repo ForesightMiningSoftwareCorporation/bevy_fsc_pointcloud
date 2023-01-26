@@ -7,15 +7,14 @@ use bevy::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendComponent,
             BlendFactor, BlendOperation, BlendState, Buffer, BufferBindingType,
-            BufferInitDescriptor, BufferUsages, CachedRenderPipelineId,
-            ColorTargetState, ColorWrites, CompareFunction,
-            DepthBiasState, DepthStencilState, Extent3d, FragmentState, FrontFace,
-            MultisampleState, PipelineCache, PolygonMode, PrimitiveState, PrimitiveTopology,
-            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
-            StencilFaceState, StencilState, Texture, TextureDescriptor,
-            TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
-            TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
-            VertexStepMode,
+            BufferInitDescriptor, BufferUsages, CachedRenderPipelineId, ColorTargetState,
+            ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Extent3d,
+            FragmentState, FrontFace, MultisampleState, PipelineCache, PolygonMode, PrimitiveState,
+            PrimitiveTopology, RenderPipelineDescriptor, Sampler, SamplerBindingType,
+            SamplerDescriptor, ShaderStages, StencilFaceState, StencilState, Texture,
+            TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
+            TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat,
+            VertexState, VertexStepMode,
         },
         renderer::RenderDevice,
         texture::{BevyDefault, TextureCache},
@@ -248,7 +247,7 @@ impl FromWorld for PointCloudPipeline {
             }),
         };
 
-        let pipeline_cache = world.resource_mut::<PipelineCache>();
+        let mut pipeline_cache = world.resource_mut::<PipelineCache>();
         let pipeline_id = pipeline_cache.queue_render_pipeline(pipeline_descriptor);
         let eye_dome_pipeline_id =
             pipeline_cache.queue_render_pipeline(eye_dome_pipeline_descriptor);

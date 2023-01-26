@@ -62,15 +62,19 @@ impl Plugin for PointCloudPlugin {
             .unwrap();
 
         draw_3d_graph.add_node(PointCloudNode::NAME, point_cloud_node);
-        draw_3d_graph.add_node_edge(
-            bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
-            PointCloudNode::NAME,
-        );
-        draw_3d_graph.add_slot_edge(
-            draw_3d_graph.input_node().id,
-            bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
-            PointCloudNode::NAME,
-            PointCloudNode::IN_VIEW,
-        );
+        draw_3d_graph
+            .add_node_edge(
+                bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
+                PointCloudNode::NAME,
+            )
+            .unwrap();
+        draw_3d_graph
+            .add_slot_edge(
+                draw_3d_graph.input_node().unwrap().id,
+                bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
+                PointCloudNode::NAME,
+                PointCloudNode::IN_VIEW,
+            )
+            .unwrap();
     }
 }

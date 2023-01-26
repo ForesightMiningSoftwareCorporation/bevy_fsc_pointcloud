@@ -30,8 +30,7 @@ impl PointCloudNode {
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_graph::{Node, SlotInfo, SlotType};
 use bevy::render::render_resource::{
-    LoadOp, Operations, PipelineCache,
-    RenderPassDepthStencilAttachment, RenderPassDescriptor,
+    LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment, RenderPassDescriptor,
 };
 use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset};
 
@@ -63,7 +62,7 @@ impl Node for PointCloudNode {
             };
         let mut render_pass =
             render_context
-                .command_encoder()
+                .command_encoder
                 .begin_render_pass(&RenderPassDescriptor {
                     label: Some("point_cloud"),
                     // NOTE: The opaque pass loads the color
@@ -123,7 +122,7 @@ impl Node for PointCloudNode {
         drop(render_pass);
         let mut render_pass =
             render_context
-                .command_encoder()
+                .command_encoder
                 .begin_render_pass(&RenderPassDescriptor {
                     label: Some("eye_dome_lighting"),
                     // NOTE: The opaque pass loads the color

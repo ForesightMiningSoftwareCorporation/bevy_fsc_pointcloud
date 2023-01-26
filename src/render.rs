@@ -23,10 +23,8 @@ impl ExtractComponent for PotreePointCloud {
 
     type Filter = ();
 
-    type Out = Self;
-
-    fn extract_component(item: bevy::ecs::query::QueryItem<'_, Self::Query>) -> Option<Self> {
-        Some(item.clone())
+    fn extract_component(item: bevy::ecs::query::QueryItem<'_, Self::Query>) -> Self {
+        item.clone()
     }
 }
 

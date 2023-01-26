@@ -1,25 +1,17 @@
-use bevy::{
-    prelude::*,
-    window::PresentMode,
-};
+use bevy::prelude::*;
 use bevy_potree::{PointCloudAsset, PotreePointCloud};
 use smooth_bevy_cameras::{
-    controllers::orbit::{OrbitCameraBundle, OrbitCameraPlugin}, LookTransformPlugin,
+    controllers::orbit::{OrbitCameraBundle, OrbitCameraPlugin},
+    LookTransformPlugin,
 };
 
 fn main() {
     let mut app = App::new();
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            present_mode: PresentMode::Immediate,
-            ..Default::default()
-        }),
-        ..Default::default()
-    }))
-    .add_plugin(LookTransformPlugin)
-    .add_plugin(OrbitCameraPlugin::default())
-    .add_plugin(bevy_potree::PointCloudPlugin::default())
-    .add_startup_system(startup);
+    app.add_plugins(DefaultPlugins.set(WindowPlugin::default()))
+        .add_plugin(LookTransformPlugin)
+        .add_plugin(OrbitCameraPlugin::default())
+        .add_plugin(bevy_potree::PointCloudPlugin::default())
+        .add_startup_system(startup);
     app.run();
 }
 
