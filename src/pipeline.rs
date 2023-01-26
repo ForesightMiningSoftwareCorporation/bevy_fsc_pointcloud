@@ -14,10 +14,10 @@ use bevy::{
             SamplerDescriptor, ShaderStages, StencilFaceState, StencilState, StorageTextureAccess,
             Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
             TextureUsages, TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout,
-            VertexFormat, VertexState, VertexStepMode,
+            VertexFormat, VertexState, VertexStepMode, IndexFormat, BlendComponent, BlendFactor, BlendOperation,
         },
         renderer::RenderDevice,
-        texture::TextureCache,
+        texture::{TextureCache, BevyDefault},
         view::{ExtractedView, ViewTarget, ViewUniforms},
     },
     utils::HashMap,
@@ -36,7 +36,7 @@ pub struct PointCloudPipeline {
     pub view_layout: BindGroupLayout,
     pub entity_layout: BindGroupLayout,
 
-    pub eye_dome_pipeline_id: CachedComputePipelineId,
+    pub eye_dome_pipeline_id: CachedRenderPipelineId,
     pub eye_dome_image_layout: BindGroupLayout,
 
     pub sampler: Sampler,
@@ -117,7 +117,7 @@ impl FromWorld for PointCloudPipeline {
                 entries: &[
                     BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: ShaderStages::COMPUTE,
+                        visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Texture {
                             sample_type: TextureSampleType::Depth,
                             view_dimension: TextureViewDimension::D2,
@@ -127,17 +127,7 @@ impl FromWorld for PointCloudPipeline {
                     },
                     BindGroupLayoutEntry {
                         binding: 1,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::StorageTexture {
-                            access: StorageTextureAccess::ReadWrite,
-                            format: TextureFormat::Rgba8Unorm,
-                            view_dimension: TextureViewDimension::D2,
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: ShaderStages::COMPUTE,
+                        visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Sampler(SamplerBindingType::NonFiltering),
                         count: None,
                     },
@@ -202,18 +192,60 @@ impl FromWorld for PointCloudPipeline {
             },
         };
 
-        let eye_dome_compute_pipeline_descriptor = ComputePipelineDescriptor {
+        let eye_dome_pipeline_descriptor = RenderPipelineDescriptor {
             label: Some("EyeDomeLightingPipeline".into()),
             layout: Some(vec![eye_dome_image_layout.clone()]),
-            shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
-            shader_defs: Vec::new(),
-            entry_point: "main".into(),
+            vertex: VertexState {
+                shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
+                shader_defs: Vec::new(),
+                entry_point: "vertex".into(),
+                buffers: vec![VertexBufferLayout {
+                    array_stride: 8,
+                    step_mode: VertexStepMode::Vertex,
+                    attributes: vec![VertexAttribute {
+                        format: VertexFormat::Float32x2,
+                        offset: 0,
+                        shader_location: 0,
+                    }],
+                }],
+            },
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::TriangleStrip,
+                strip_index_format: None,
+                front_face: FrontFace::Ccw,
+                cull_mode: None,
+                unclipped_depth: false,
+                polygon_mode: PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: Default::default(),
+            fragment: Some(FragmentState {
+                shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
+                shader_defs: Vec::new(),
+                entry_point: "fragment".into(),
+                targets: vec![
+                    Some(ColorTargetState {
+                        format: TextureFormat::bevy_default(),
+                        blend: Some(BlendState {
+                            color: BlendComponent {
+                                src_factor: BlendFactor::DstAlpha,
+                                dst_factor: BlendFactor::Zero,
+                                operation: BlendOperation::Add
+                            }, alpha: BlendComponent {
+                                src_factor: BlendFactor::One,
+                                dst_factor: BlendFactor::Zero,
+                                operation: BlendOperation::Add
+                            }
+                        }), write_mask: ColorWrites::COLOR })
+                ],
+            })
         };
 
         let pipeline_cache = world.resource_mut::<PipelineCache>();
         let pipeline_id = pipeline_cache.queue_render_pipeline(pipeline_descriptor);
         let eye_dome_pipeline_id =
-            pipeline_cache.queue_compute_pipeline(eye_dome_compute_pipeline_descriptor);
+            pipeline_cache.queue_render_pipeline(eye_dome_pipeline_descriptor);
 
         Self {
             pipeline_id,
@@ -274,12 +306,6 @@ pub(crate) fn prepare_view_targets(
                         },
                         BindGroupEntry {
                             binding: 1,
-                            resource: bevy::render::render_resource::BindingResource::TextureView(
-                                &view_target.main_texture(),
-                            ),
-                        },
-                        BindGroupEntry {
-                            binding: 2,
                             resource: bevy::render::render_resource::BindingResource::Sampler(
                                 &pipeline.sampler,
                             ),

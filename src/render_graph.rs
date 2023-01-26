@@ -31,7 +31,7 @@ use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_graph::{Node, SlotInfo, SlotType};
 use bevy::render::render_resource::{
     ComputePassDescriptor, LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor,
+    RenderPassDescriptor, RenderPassColorAttachment,
 };
 use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset};
 
@@ -61,7 +61,6 @@ impl Node for PointCloudNode {
                     return Ok(());
                 } // No window
             };
-        let _color = Color::rgba(0.0, 0.0, 0.0, 0.0);
         let mut render_pass =
             render_context
                 .command_encoder()
@@ -89,7 +88,7 @@ impl Node for PointCloudNode {
         let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline = pipeline_cache.get_render_pipeline(point_cloud_pipeline.pipeline_id);
         let eye_dome_pipeline =
-            pipeline_cache.get_compute_pipeline(point_cloud_pipeline.eye_dome_pipeline_id);
+            pipeline_cache.get_render_pipeline(point_cloud_pipeline.eye_dome_pipeline_id);
         if pipeline.is_none() || eye_dome_pipeline.is_none() {
             println!("No pipeline");
             return Ok(());
@@ -125,13 +124,20 @@ impl Node for PointCloudNode {
         let mut render_pass =
             render_context
                 .command_encoder()
-                .begin_compute_pass(&ComputePassDescriptor {
-                    label: "Eye Dome Lighting".into(),
+                .begin_render_pass(&RenderPassDescriptor {
+                    label: Some("eye_dome_lighting"),
+                    // NOTE: The opaque pass loads the color
+                    // buffer as well as writing to it.
+                    color_attachments: &[Some(target.get_color_attachment(Operations {
+                        load: LoadOp::Load,
+                        store: true
+                    }))],
+                    depth_stencil_attachment: None,
                 });
-        render_pass.set_pipeline(eye_dome_pipeline);
-        render_pass.set_bind_group(0, &eye_dome_view_target.bind_group, &[]);
-        render_pass.dispatch_workgroups(view.viewport.z / 8, view.viewport.w / 8, 1);
-
+        //render_pass.set_pipeline(eye_dome_pipeline);
+        //render_pass.set_bind_group(0, &eye_dome_view_target.bind_group, &[]);
+        //render_pass.set_vertex_buffer(0, *point_cloud_pipeline.instanced_point_quad.slice(0..32));
+        //render_pass.draw(0..4, 0..1);
         Ok(())
     }
 

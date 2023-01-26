@@ -58,7 +58,6 @@ impl AssetLoader for LasLoader {
         Box::pin(async move {
             let mut reader =
                 las::Reader::new(std::io::Cursor::new(bytes)).expect("Unable to open reader");
-            println!("headers: {:?}", reader.header());
             let mut mesh = Mesh::new(PrimitiveTopology::PointList);
             let mut max: Point = [f32::MIN; 3].into();
             let mut min: Point = [f32::MAX; 3].into();

@@ -1,4 +1,4 @@
-use bevy::{prelude::*, window::PresentMode, render::view::ViewPlugin};
+use bevy::{prelude::*, window::PresentMode, render::view::{ViewPlugin, RenderLayers}};
 use bevy_potree::{PointCloudAsset, PotreePointCloud};
 
 fn main() {
@@ -18,7 +18,7 @@ fn main() {
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     println!("Starting");
     let _path = std::env::args().skip(1).next();
-    let mesh: Handle<PointCloudAsset> = asset_server.load("points.las");
+    let mesh: Handle<PointCloudAsset> = asset_server.load("points.laz");
 
     commands
         .spawn(SpatialBundle::default())
