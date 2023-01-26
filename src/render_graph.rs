@@ -30,8 +30,8 @@ impl PointCloudNode {
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_graph::{Node, SlotInfo, SlotType};
 use bevy::render::render_resource::{
-    ComputePassDescriptor, LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor, RenderPassColorAttachment,
+    LoadOp, Operations, PipelineCache,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor,
 };
 use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset};
 
@@ -54,7 +54,7 @@ impl Node for PointCloudNode {
         world: &World,
     ) -> Result<(), bevy::render::render_graph::NodeRunError> {
         let view_entity = graph.get_input_entity(Self::IN_VIEW)?;
-        let (view, target, _depth, view_uniform_offset, eye_dome_view_target) =
+        let (_view, target, _depth, view_uniform_offset, eye_dome_view_target) =
             match self.query.get_manual(world, view_entity) {
                 Ok(query) => query,
                 Err(_) => {
@@ -130,14 +130,14 @@ impl Node for PointCloudNode {
                     // buffer as well as writing to it.
                     color_attachments: &[Some(target.get_color_attachment(Operations {
                         load: LoadOp::Load,
-                        store: true
+                        store: true,
                     }))],
                     depth_stencil_attachment: None,
                 });
-        //render_pass.set_pipeline(eye_dome_pipeline);
-        //render_pass.set_bind_group(0, &eye_dome_view_target.bind_group, &[]);
-        //render_pass.set_vertex_buffer(0, *point_cloud_pipeline.instanced_point_quad.slice(0..32));
-        //render_pass.draw(0..4, 0..1);
+        render_pass.set_pipeline(eye_dome_pipeline);
+        render_pass.set_bind_group(0, &eye_dome_view_target.bind_group, &[]);
+        render_pass.set_vertex_buffer(0, *point_cloud_pipeline.instanced_point_quad.slice(0..32));
+        render_pass.draw(0..4, 0..1);
         Ok(())
     }
 

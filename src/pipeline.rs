@@ -5,19 +5,20 @@ use bevy::{
         camera::ExtractedCamera,
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState, Buffer,
-            BufferBindingType, BufferInitDescriptor, BufferUsages, CachedComputePipelineId,
-            CachedRenderPipelineId, ColorTargetState, ColorWrites, CompareFunction,
-            ComputePipelineDescriptor, DepthBiasState, DepthStencilState, Extent3d, FragmentState,
-            FrontFace, MultisampleState, PipelineCache, PolygonMode, PrimitiveState,
-            PrimitiveTopology, RenderPipelineDescriptor, Sampler, SamplerBindingType,
-            SamplerDescriptor, ShaderStages, StencilFaceState, StencilState, StorageTextureAccess,
-            Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
-            TextureUsages, TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout,
-            VertexFormat, VertexState, VertexStepMode, IndexFormat, BlendComponent, BlendFactor, BlendOperation,
+            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendComponent,
+            BlendFactor, BlendOperation, BlendState, Buffer, BufferBindingType,
+            BufferInitDescriptor, BufferUsages, CachedRenderPipelineId,
+            ColorTargetState, ColorWrites, CompareFunction,
+            DepthBiasState, DepthStencilState, Extent3d, FragmentState, FrontFace,
+            MultisampleState, PipelineCache, PolygonMode, PrimitiveState, PrimitiveTopology,
+            RenderPipelineDescriptor, Sampler, SamplerBindingType, SamplerDescriptor, ShaderStages,
+            StencilFaceState, StencilState, Texture, TextureDescriptor,
+            TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
+            TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
+            VertexStepMode,
         },
         renderer::RenderDevice,
-        texture::{TextureCache, BevyDefault},
+        texture::{BevyDefault, TextureCache},
         view::{ExtractedView, ViewTarget, ViewUniforms},
     },
     utils::HashMap,
@@ -219,27 +220,32 @@ impl FromWorld for PointCloudPipeline {
                 conservative: false,
             },
             depth_stencil: None,
-            multisample: Default::default(),
+            multisample: MultisampleState {
+                count: 4,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
             fragment: Some(FragmentState {
                 shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
                 shader_defs: Vec::new(),
                 entry_point: "fragment".into(),
-                targets: vec![
-                    Some(ColorTargetState {
-                        format: TextureFormat::bevy_default(),
-                        blend: Some(BlendState {
-                            color: BlendComponent {
-                                src_factor: BlendFactor::DstAlpha,
-                                dst_factor: BlendFactor::Zero,
-                                operation: BlendOperation::Add
-                            }, alpha: BlendComponent {
-                                src_factor: BlendFactor::One,
-                                dst_factor: BlendFactor::Zero,
-                                operation: BlendOperation::Add
-                            }
-                        }), write_mask: ColorWrites::COLOR })
-                ],
-            })
+                targets: vec![Some(ColorTargetState {
+                    format: TextureFormat::bevy_default(),
+                    blend: Some(BlendState {
+                        color: BlendComponent {
+                            src_factor: BlendFactor::Zero,
+                            dst_factor: BlendFactor::SrcAlpha,
+                            operation: BlendOperation::Add,
+                        },
+                        alpha: BlendComponent {
+                            src_factor: BlendFactor::One,
+                            dst_factor: BlendFactor::Zero,
+                            operation: BlendOperation::Add,
+                        },
+                    }),
+                    write_mask: ColorWrites::COLOR,
+                })],
+            }),
         };
 
         let pipeline_cache = world.resource_mut::<PipelineCache>();
@@ -274,7 +280,7 @@ pub(crate) fn prepare_view_targets(
     cameras: Query<(Entity, &ExtractedCamera, &ExtractedView, &ViewTarget)>,
 ) {
     let mut textures = HashMap::default();
-    for (entity, camera, _view, view_target) in cameras.iter() {
+    for (entity, camera, _view, _view_target) in cameras.iter() {
         if let Some(target_size) = camera.physical_target_size {
             let size = Extent3d {
                 width: target_size.x,
