@@ -6,10 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy =  { path = "../bevy" }
+bevy =  { git = "https://github.com/bevyengine/bevy" }
 las = { version = "0.8", features = ["laz"] }
 smooth-bevy-cameras = { git = "https://github.com/olegomon/smooth-bevy-cameras" }
 
 [patch."crates-io"]
-bevy = { path = "../bevy" }
-naga = { path = "../naga" }
+bevy =  { git = "https://github.com/bevyengine/bevy" }
+naga = { git = "https://github.com/gfx-rs/naga" }

@@ -64,7 +64,7 @@ impl Node for PointCloudNode {
         let _color = Color::rgba(0.0, 0.0, 0.0, 0.0);
         let mut render_pass =
             render_context
-                .command_encoder
+                .command_encoder()
                 .begin_render_pass(&RenderPassDescriptor {
                     label: Some("point_cloud"),
                     // NOTE: The opaque pass loads the color
@@ -124,7 +124,7 @@ impl Node for PointCloudNode {
         drop(render_pass);
         let mut render_pass =
             render_context
-                .command_encoder
+                .command_encoder()
                 .begin_compute_pass(&ComputePassDescriptor {
                     label: "Eye Dome Lighting".into(),
                 });

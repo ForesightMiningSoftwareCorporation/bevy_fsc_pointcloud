@@ -1,13 +1,13 @@
-use bevy::{prelude::*, window::PresentMode};
+use bevy::{prelude::*, window::PresentMode, render::view::ViewPlugin};
 use bevy_potree::{PointCloudAsset, PotreePointCloud};
 
 fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        window: WindowDescriptor {
+        primary_window: Some(Window {
             present_mode: PresentMode::Immediate,
             ..Default::default()
-        },
+        }),
         ..Default::default()
     }))
     .add_plugin(bevy_potree::PointCloudPlugin::default())

@@ -165,7 +165,7 @@ impl FromWorld for PointCloudPipeline {
                 shader_defs: Default::default(),
                 entry_point: "main".into(),
                 targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::Rgba8Unorm,
+                    format: TextureFormat::Rgba8UnormSrgb,
                     blend: Some(BlendState::REPLACE),
                     write_mask: ColorWrites::ALL,
                 })],
@@ -210,7 +210,7 @@ impl FromWorld for PointCloudPipeline {
             entry_point: "main".into(),
         };
 
-        let mut pipeline_cache = world.resource_mut::<PipelineCache>();
+        let pipeline_cache = world.resource_mut::<PipelineCache>();
         let pipeline_id = pipeline_cache.queue_render_pipeline(pipeline_descriptor);
         let eye_dome_pipeline_id =
             pipeline_cache.queue_compute_pipeline(eye_dome_compute_pipeline_descriptor);
