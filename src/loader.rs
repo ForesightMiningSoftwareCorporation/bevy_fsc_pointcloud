@@ -10,7 +10,7 @@ use bevy::{
 use las::Read;
 
 pub const ATTRIBUTE_COLOR: MeshVertexAttribute =
-    MeshVertexAttribute::new("Vertex_Color", 1, VertexFormat::Float32);
+    MeshVertexAttribute::new("Vertex_Color", 1, VertexFormat::Float32x3);
 
 #[repr(transparent)]
 struct Point {
@@ -61,33 +61,40 @@ impl AssetLoader for LasLoader {
             let mut mesh = Mesh::new(PrimitiveTopology::PointList);
             let mut max: Point = [f32::MIN; 3].into();
             let mut min: Point = [f32::MAX; 3].into();
-            let mut positions = reader
+            let (mut positions, colors): (Vec<_>, Vec<_>) = reader
                 .points()
-                .take(500000)
                 .map(|a| {
                     let p = a.unwrap();
-                    let p: Point = [p.x as f32, p.y as f32, p.z as f32].into();
-                    min = min.min(&p);
-                    max = max.max(&p);
-                    p.inner
+                    let position = {
+                        let p: Point = [p.x as f32, p.z as f32, p.y as f32].into();
+                        min = min.min(&p);
+                        max = max.max(&p);
+                        p.inner
+                    };
+                    let color = {
+                        if let Some(color) = &p.color {
+                            Vec3::new(
+                                color.red as f32 / u16::MAX as f32,
+                                color.green as f32 / u16::MAX as f32,
+                                color.blue as f32 / u16::MAX as f32,
+                            )
+                        } else {
+                            let intensity = p.intensity as f32 * 0.01;
+                            Vec3::new(
+                                intensity, intensity, intensity
+                            )
+                        }
+                    };
+                    (position, color)
                 })
-                .collect::<Vec<_>>();
-
-            let colors = reader
-                .points()
-                .take(500000)
-                .map(|a| {
-                    let p = a.unwrap();
-                    let intensity = p.intensity as f32 * 0.001;
-                    intensity
-                })
-                .collect::<Vec<_>>();
-
+                .unzip();
             let aabb = [
                 max.inner[0] - min.inner[0],
                 max.inner[1] - min.inner[1],
                 max.inner[2] - min.inner[2],
             ];
+
+            // Normalize the positions
             let scale = aabb[0].max(aabb[1]).max(aabb[2]);
             for i in positions.iter_mut() {
                 i[0] -= min.inner[0];

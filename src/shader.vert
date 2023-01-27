@@ -1,10 +1,7 @@
-
-
-
 layout(location = 0) in vec2 in_Position_Point;
 
 
-layout(location = 0) out float out_Color;
+layout(location = 0) out vec3 out_Color;
 layout(location = 1) out vec2 out_Point_Location;
 
 layout(set = 0, binding = 0) uniform View {
@@ -19,8 +16,12 @@ layout(set = 0, binding = 0) uniform View {
 };
 
 struct Point {
-    vec3 position;
-    float color;
+    float position_x;
+    float position_y;
+    float position_z;
+    float color_r;
+    float color_g;
+    float color_b;
 };
 
 layout(std430, set = 1, binding = 0) readonly buffer Asset {
@@ -29,9 +30,9 @@ layout(std430, set = 1, binding = 0) readonly buffer Asset {
 
 void main() {
     Point p = points[gl_InstanceIndex];
-    vec4 out_Pos = view_proj * vec4(p.position, 1.0);
+    vec4 out_Pos = view_proj * vec4(p.position_x, p.position_y, p.position_z, 1.0);
 
-    out_Color = p.color;
+    out_Color = vec3(p.color_r, p.color_g, p.color_b);
 
     float depth = out_Pos.w;
     float one_over_slope = projection[1][1]; // (0.5 * fov_y_radians).tan()
