@@ -24,6 +24,7 @@ pub struct PointCloudPlugin;
 
 impl Plugin for PointCloudPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
+        let point_cloud_pipeline = PointCloudPipeline::from_app(app);
         app.add_asset::<PointCloudAsset>()
             .add_asset_loader(LasLoader)
             //.add_plugin(LookTransformPlugin)
@@ -53,7 +54,7 @@ impl Plugin for PointCloudPlugin {
             .add_system_to_stage(RenderStage::Prepare, prepare_point_cloud_bind_group)
             .add_system_to_stage(RenderStage::Queue, prepare_view_targets)
             .init_resource::<PointCloudBindGroup>()
-            .init_resource::<PointCloudPipeline>();
+            .insert_resource(point_cloud_pipeline);
         let point_cloud_node = PointCloudNode::new(&mut render_app.world);
 
         let mut render_graph = render_app.world.resource_mut::<RenderGraph>();

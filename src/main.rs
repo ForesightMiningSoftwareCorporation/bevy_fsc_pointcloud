@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_potree::{PointCloudAsset, PotreePointCloud};
 use smooth_bevy_cameras::{
-    controllers::{orbit::{OrbitCameraBundle, OrbitCameraPlugin}, fps::{FpsCameraBundle, FpsCameraPlugin}},
+    controllers::{fps::{FpsCameraBundle, FpsCameraPlugin}},
     LookTransformPlugin,
 };
 
@@ -10,6 +10,9 @@ fn main() {
     app.add_plugins(DefaultPlugins.set(WindowPlugin::default()))
         .add_plugin(LookTransformPlugin)
         .add_plugin(FpsCameraPlugin::default())
+        .insert_resource(Msaa {
+            samples: 1,
+        })
         .add_plugin(bevy_potree::PointCloudPlugin::default())
         .add_startup_system(startup);
     app.run();

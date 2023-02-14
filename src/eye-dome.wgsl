@@ -1,5 +1,11 @@
+#ifdef MULTISAMPLED
 @group(0) @binding(0)
 var input_texture: texture_depth_multisampled_2d;
+#else
+@group(0) @binding(0)
+var input_texture: texture_depth_2d;
+#endif
+
 
 @group(0) @binding(1) var s: sampler;
 

@@ -18,7 +18,7 @@ use bevy::{
         },
         renderer::RenderDevice,
         texture::{BevyDefault, TextureCache},
-        view::{ExtractedView, ViewTarget, ViewUniforms},
+        view::{ExtractedView, ViewTarget, ViewUniforms}, RenderApp,
     },
     utils::HashMap,
 };
@@ -68,8 +68,11 @@ pub(crate) fn prepare_point_cloud_bind_group(
 
 const QUAD_VERTEX_BUF: &'static [f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
 
-impl FromWorld for PointCloudPipeline {
-    fn from_world(world: &mut World) -> Self {
+impl PointCloudPipeline {
+    pub fn from_app(app: &mut App) -> Self {
+        let msaa = app.world.get_resource::<Msaa>().map(|a| a.samples).unwrap_or(1);
+        let render_app = app.sub_app_mut(RenderApp);
+        let world = &mut render_app.world;
         let render_device = world.resource::<RenderDevice>();
         let instanced_point_quad = render_device.create_buffer_with_data(&BufferInitDescriptor {
             label: "instanced point quad".into(),
@@ -82,7 +85,7 @@ impl FromWorld for PointCloudPipeline {
             usage: BufferUsages::VERTEX,
         });
         let sampler = render_device.create_sampler(&SamplerDescriptor {
-            label: "Eye Dome Shadingd Sampler".into(),
+            label: "Eye Dome Shading Sampler".into(),
             ..Default::default()
         });
         let view_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -121,7 +124,7 @@ impl FromWorld for PointCloudPipeline {
                         ty: BindingType::Texture {
                             sample_type: TextureSampleType::Depth,
                             view_dimension: TextureViewDimension::D2,
-                            multisampled: true,
+                            multisampled: msaa > 1,
                         },
                         count: None,
                     },
@@ -186,7 +189,7 @@ impl FromWorld for PointCloudPipeline {
                 },
             }),
             multisample: MultisampleState {
-                count: 4,
+                count: msaa,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
@@ -197,7 +200,11 @@ impl FromWorld for PointCloudPipeline {
             layout: Some(vec![eye_dome_image_layout.clone()]),
             vertex: VertexState {
                 shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
-                shader_defs: Vec::new(),
+                shader_defs: if msaa > 1 {
+                    vec!["MULTISAMPLED".to_string()]
+                } else {
+                    Vec::new()
+                },
                 entry_point: "vertex".into(),
                 buffers: vec![VertexBufferLayout {
                     array_stride: 8,
@@ -220,13 +227,17 @@ impl FromWorld for PointCloudPipeline {
             },
             depth_stencil: None,
             multisample: MultisampleState {
-                count: 4,
+                count: msaa,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
             fragment: Some(FragmentState {
                 shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
-                shader_defs: Vec::new(),
+                shader_defs: if msaa > 1 {
+                    vec!["MULTISAMPLED".to_string()]
+                } else {
+                    Vec::new()
+                },
                 entry_point: "fragment".into(),
                 targets: vec![Some(ColorTargetState {
                     format: TextureFormat::bevy_default(),
@@ -277,7 +288,9 @@ pub(crate) fn prepare_view_targets(
     mut texture_cache: ResMut<TextureCache>,
     pipeline: Res<PointCloudPipeline>,
     cameras: Query<(Entity, &ExtractedCamera, &ExtractedView, &ViewTarget)>,
+    msaa: Option<Res<Msaa>>
 ) {
+    let msaa = msaa.map(|a| a.samples).unwrap_or(1);
     let mut textures = HashMap::default();
     for (entity, camera, _view, _view_target) in cameras.iter() {
         if let Some(target_size) = camera.physical_target_size {
@@ -292,7 +305,7 @@ pub(crate) fn prepare_view_targets(
                     label: None,
                     size,
                     mip_level_count: 1,
-                    sample_count: 4,
+                    sample_count: msaa,
                     dimension: TextureDimension::D2,
                     format: TextureFormat::Depth32Float,
                     usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
