@@ -3,29 +3,49 @@ use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     prelude::*,
     render::{
-        extract_component::ExtractComponent,
+        extract_component::{ComponentUniforms, ExtractComponent},
         render_asset::RenderAsset,
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferBinding,
-            BufferInitDescriptor, BufferUsages,
+            BufferInitDescriptor, BufferUsages, ShaderType,
         },
         renderer::RenderDevice,
+        Extract,
     },
 };
 
 #[derive(Component, Clone)]
 pub struct PotreePointCloud {
     pub mesh: Handle<PointCloudAsset>,
+    pub point_size: f32,
+}
+#[derive(Component, Clone, ShaderType)]
+pub struct PointCloudUniform {
+    pub transform: Mat4,
+    pub point_size: f32,
 }
 
-impl ExtractComponent for PotreePointCloud {
-    type Query = &'static Self;
+pub(crate) fn extract_point_cloud(
+    mut commands: Commands,
+    mut previous_len: Local<usize>,
+    query: Extract<Query<(Entity, &PotreePointCloud, &GlobalTransform)>>,
+) {
+    let mut values = Vec::with_capacity(*previous_len);
 
-    type Filter = ();
-
-    fn extract_component(item: bevy::ecs::query::QueryItem<'_, Self::Query>) -> Self {
-        item.clone()
+    for (entity, point_cloud, transform) in query.iter() {
+        values.push((
+            entity,
+            (
+                PointCloudUniform {
+                    transform: transform.compute_matrix(),
+                    point_size: point_cloud.point_size,
+                },
+                point_cloud.mesh.clone(),
+            ),
+        ));
     }
+    *previous_len = values.len();
+    commands.insert_or_spawn_batch(values);
 }
 
 pub struct PreparedPointCloudAsset {

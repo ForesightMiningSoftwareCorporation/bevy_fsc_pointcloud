@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_potree::{PointCloudAsset, PotreePointCloud};
 use smooth_bevy_cameras::{
-    controllers::{fps::{FpsCameraBundle, FpsCameraPlugin}},
+    controllers::fps::{FpsCameraBundle, FpsCameraPlugin},
     LookTransformPlugin,
 };
 
@@ -10,22 +10,22 @@ fn main() {
     app.add_plugins(DefaultPlugins.set(WindowPlugin::default()))
         .add_plugin(LookTransformPlugin)
         .add_plugin(FpsCameraPlugin::default())
-        .insert_resource(Msaa {
-            samples: 1,
-        })
+        .insert_resource(Msaa { samples: 1 })
         .add_plugin(bevy_potree::PointCloudPlugin::default())
         .add_startup_system(startup);
     app.run();
 }
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    println!("Starting");
-    let _path = std::env::args().skip(1).next();
     let mesh: Handle<PointCloudAsset> = asset_server.load("laman_mahkota.laz");
 
     commands
-        .spawn(SpatialBundle::default())
-        .insert(PotreePointCloud { mesh });
+        .spawn(PotreePointCloud {
+            mesh,
+            point_size: 0.001,
+        })
+        .insert(Transform::from_translation(Vec3::new(3.0, 0.0, 0.0)))
+        .insert(GlobalTransform::default());
 
     commands
         .spawn(Camera3dBundle {

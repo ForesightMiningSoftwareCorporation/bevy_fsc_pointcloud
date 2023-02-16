@@ -3,6 +3,7 @@ use bevy::{
     reflect::TypeUuid,
     render::{
         camera::ExtractedCamera,
+        extract_component::ComponentUniforms,
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendComponent,
@@ -18,10 +19,13 @@ use bevy::{
         },
         renderer::RenderDevice,
         texture::{BevyDefault, TextureCache},
-        view::{ExtractedView, ViewTarget, ViewUniforms}, RenderApp,
+        view::{ExtractedView, ViewTarget, ViewUniforms},
+        RenderApp,
     },
     utils::HashMap,
 };
+
+use crate::PointCloudUniform;
 
 pub(crate) const POINT_CLOUD_VERT_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf01);
@@ -35,6 +39,7 @@ pub struct PointCloudPipeline {
     pub pipeline_id: CachedRenderPipelineId,
     pub view_layout: BindGroupLayout,
     pub entity_layout: BindGroupLayout,
+    pub model_layout: BindGroupLayout,
 
     pub eye_dome_pipeline_id: CachedRenderPipelineId,
     pub eye_dome_image_layout: BindGroupLayout,
@@ -46,11 +51,13 @@ pub struct PointCloudPipeline {
 #[derive(Resource, Default)]
 pub struct PointCloudBindGroup {
     pub bind_group: Option<BindGroup>,
+    pub model_bind_group: Option<BindGroup>,
 }
 pub(crate) fn prepare_point_cloud_bind_group(
     render_device: Res<RenderDevice>,
     pipeline: Res<PointCloudPipeline>,
     view_uniform: Res<ViewUniforms>,
+    model_uniform: Res<ComponentUniforms<PointCloudUniform>>,
     mut bind_groups: ResMut<PointCloudBindGroup>,
 ) {
     if let Some(resource) = view_uniform.uniforms.binding() {
@@ -64,13 +71,29 @@ pub(crate) fn prepare_point_cloud_bind_group(
         });
         bind_groups.bind_group = Some(bind_group);
     }
+
+    if let Some(binding) = model_uniform.uniforms().binding() {
+        bind_groups.model_bind_group =
+            Some(render_device.create_bind_group(&BindGroupDescriptor {
+                entries: &[BindGroupEntry {
+                    binding: 0,
+                    resource: binding,
+                }],
+                label: Some("point_cloud_model_bind_group"),
+                layout: &pipeline.model_layout,
+            }));
+    }
 }
 
 const QUAD_VERTEX_BUF: &'static [f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
 
 impl PointCloudPipeline {
     pub fn from_app(app: &mut App) -> Self {
-        let msaa = app.world.get_resource::<Msaa>().map(|a| a.samples).unwrap_or(1);
+        let msaa = app
+            .world
+            .get_resource::<Msaa>()
+            .map(|a| a.samples)
+            .unwrap_or(1);
         let render_app = app.sub_app_mut(RenderApp);
         let world = &mut render_app.world;
         let render_device = world.resource::<RenderDevice>();
@@ -102,13 +125,26 @@ impl PointCloudPipeline {
             }],
         });
         let entity_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("PointCloudViewLabel"),
+            label: Some("PointCloudViewLayout"),
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
                 visibility: ShaderStages::VERTEX,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+        let model_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("PointCloudModelLayout"),
+            entries: &[BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
                     min_binding_size: None,
                 },
                 count: None,
@@ -138,7 +174,11 @@ impl PointCloudPipeline {
             });
         let pipeline_descriptor = RenderPipelineDescriptor {
             label: Some("point_cloud_pipeline".into()),
-            layout: Some(vec![view_layout.clone(), entity_layout.clone()]),
+            layout: Some(vec![
+                view_layout.clone(),
+                entity_layout.clone(),
+                model_layout.clone(),
+            ]),
             vertex: VertexState {
                 shader: POINT_CLOUD_VERT_SHADER_HANDLE.typed(),
                 shader_defs: Default::default(),
@@ -266,6 +306,7 @@ impl PointCloudPipeline {
         Self {
             pipeline_id,
             view_layout,
+            model_layout,
             entity_layout,
             eye_dome_pipeline_id,
             eye_dome_image_layout,
@@ -288,7 +329,7 @@ pub(crate) fn prepare_view_targets(
     mut texture_cache: ResMut<TextureCache>,
     pipeline: Res<PointCloudPipeline>,
     cameras: Query<(Entity, &ExtractedCamera, &ExtractedView, &ViewTarget)>,
-    msaa: Option<Res<Msaa>>
+    msaa: Option<Res<Msaa>>,
 ) {
     let msaa = msaa.map(|a| a.samples).unwrap_or(1);
     let mut textures = HashMap::default();

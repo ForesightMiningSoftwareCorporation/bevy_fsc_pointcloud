@@ -7,7 +7,7 @@ use bevy::{
     asset::load_internal_asset,
     prelude::*,
     render::{
-        extract_component::ExtractComponentPlugin,
+        extract_component::{ExtractComponentPlugin, UniformComponentPlugin},
         render_asset::{PrepareAssetLabel, RenderAssetPlugin},
         render_graph::RenderGraph,
         render_resource::ShaderStage,
@@ -34,8 +34,7 @@ impl Plugin for PointCloudPlugin {
                     PrepareAssetLabel::AssetPrepare,
                 ),
             )
-            .add_plugin(ExtractComponentPlugin::<PotreePointCloud>::default());
-
+            .add_plugin(UniformComponentPlugin::<PointCloudUniform>::default());
         load_internal_asset!(app, POINT_CLOUD_VERT_SHADER_HANDLE, "shader.vert", |s| {
             Shader::from_glsl(s, ShaderStage::Vertex)
         });
@@ -51,6 +50,7 @@ impl Plugin for PointCloudPlugin {
         let render_app = app.sub_app_mut(RenderApp);
 
         render_app
+            .add_system_to_stage(RenderStage::Extract, extract_point_cloud)
             .add_system_to_stage(RenderStage::Prepare, prepare_point_cloud_bind_group)
             .add_system_to_stage(RenderStage::Queue, prepare_view_targets)
             .init_resource::<PointCloudBindGroup>()

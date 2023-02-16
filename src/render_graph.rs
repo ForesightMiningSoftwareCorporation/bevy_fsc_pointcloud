@@ -1,6 +1,7 @@
 use bevy::core_pipeline::core_3d::MainPass3dNode;
 use bevy::prelude::*;
-
+use bevy::render::extract_component::DynamicUniformIndex;
+use bevy::render::render_resource::ShaderStages;
 pub struct PointCloudNode {
     query: QueryState<
         (
@@ -12,7 +13,10 @@ pub struct PointCloudNode {
         ),
         With<ExtractedView>,
     >,
-    entity_query: QueryState<(&'static PotreePointCloud,)>,
+    entity_query: QueryState<(
+        &'static Handle<PointCloudAsset>,
+        &'static DynamicUniformIndex<PointCloudUniform>,
+    )>,
 }
 
 impl PointCloudNode {
@@ -35,7 +39,7 @@ use bevy::render::render_resource::{
 use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset};
 
 use crate::pipeline::{EyeDomeViewTarget, PointCloudBindGroup, PointCloudPipeline};
-use crate::{PointCloudAsset, PotreePointCloud};
+use crate::{PointCloudAsset, PointCloudUniform, PotreePointCloud};
 impl Node for PointCloudNode {
     fn input(&self) -> Vec<SlotInfo> {
         vec![SlotInfo::new(MainPass3dNode::IN_VIEW, SlotType::Entity)]
@@ -97,7 +101,7 @@ impl Node for PointCloudNode {
 
         render_pass.set_pipeline(pipeline);
         let bind_groups = world.resource::<PointCloudBindGroup>();
-        if bind_groups.bind_group.is_none() {
+        if bind_groups.bind_group.is_none() || bind_groups.model_bind_group.is_none() {
             println!("No bind group");
             return Ok(());
         }
@@ -108,14 +112,19 @@ impl Node for PointCloudNode {
         );
         render_pass.set_vertex_buffer(0, *point_cloud_pipeline.instanced_point_quad.slice(0..32));
         let render_assets = world.resource::<RenderAssets<PointCloudAsset>>();
-        for (point_cloud,) in self.entity_query.iter_manual(&world) {
-            let point_cloud_asset = render_assets.get(&point_cloud.mesh);
+        for (point_cloud_asset, dynamic_index) in self.entity_query.iter_manual(&world) {
+            let point_cloud_asset = render_assets.get(point_cloud_asset);
             if point_cloud_asset.is_none() {
                 continue;
             }
             let point_cloud_asset = point_cloud_asset.unwrap();
             render_pass.set_bind_group(1, &point_cloud_asset.bind_group, &[]);
 
+            render_pass.set_bind_group(
+                2,
+                &bind_groups.model_bind_group.as_ref().unwrap(),
+                &[dynamic_index.index()],
+            );
             render_pass.draw(0..4, 0..point_cloud_asset.num_points);
         }
 

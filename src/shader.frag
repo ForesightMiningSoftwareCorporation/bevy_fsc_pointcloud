@@ -14,6 +14,10 @@ layout(set = 0, binding = 0) uniform View {
     vec3 world_position;
     vec4 viewport;
 };
+layout(set = 2, binding = 0) uniform Model {
+    mat4 model_transform;
+    float point_size;
+};
 
 void main()
 {
@@ -23,8 +27,7 @@ void main()
 
 
     float depth = 1.0 / gl_FragCoord.w; // the world space depth
-    float world_radius = 0.005;
-    float offseted_depth = depth + world_radius * depth_offset;
+    float offseted_depth = depth + point_size * depth_offset;
 
     float z_near = gl_FragCoord.z * depth;
     gl_FragDepth = z_near / offseted_depth;

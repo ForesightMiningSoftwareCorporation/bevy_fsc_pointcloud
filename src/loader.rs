@@ -80,9 +80,7 @@ impl AssetLoader for LasLoader {
                             )
                         } else {
                             let intensity = p.intensity as f32 * 0.01;
-                            Vec3::new(
-                                intensity, intensity, intensity
-                            )
+                            Vec3::new(intensity, intensity, intensity)
                         }
                     };
                     (position, color)
