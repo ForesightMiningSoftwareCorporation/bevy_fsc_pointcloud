@@ -9,3 +9,4 @@ edition = "2021"
 bevy = "0.9"
 las = { version = "0.8", features = ["laz"] }
 smooth-bevy-cameras = { git = "https://github.com/olegomon/smooth-bevy-cameras" }
+csv = "1.2"

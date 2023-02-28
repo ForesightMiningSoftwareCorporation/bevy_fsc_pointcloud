@@ -46,6 +46,8 @@ pub struct PointCloudPipeline {
 
     pub sampler: Sampler,
     pub instanced_point_quad: Buffer,
+
+    pub colored: bool
 }
 
 #[derive(Resource, Default)]
@@ -87,8 +89,19 @@ pub(crate) fn prepare_point_cloud_bind_group(
 
 const QUAD_VERTEX_BUF: &'static [f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
 
+#[derive(Clone, Resource)]
+pub struct PointCloudPipelineConfig {
+    pub colored: bool
+}
+impl Default for PointCloudPipelineConfig {
+    fn default() -> Self {
+        Self {
+            colored: true,
+        }
+    }
+}
 impl PointCloudPipeline {
-    pub fn from_app(app: &mut App) -> Self {
+    pub fn from_app(app: &mut App, colored: bool) -> Self {
         let msaa = app
             .world
             .get_resource::<Msaa>()
@@ -181,7 +194,11 @@ impl PointCloudPipeline {
             ]),
             vertex: VertexState {
                 shader: POINT_CLOUD_VERT_SHADER_HANDLE.typed(),
-                shader_defs: Default::default(),
+                shader_defs: if colored {
+                    vec!["COLORED".to_string()]
+                } else {
+                    Default::default()
+                },
                 entry_point: "main".into(),
                 buffers: vec![VertexBufferLayout {
                     array_stride: 8,
@@ -195,7 +212,11 @@ impl PointCloudPipeline {
             },
             fragment: Some(FragmentState {
                 shader: POINT_CLOUD_FRAG_SHADER_HANDLE.typed(),
-                shader_defs: Default::default(),
+                shader_defs: if colored {
+                    vec!["COLORED".to_string()]
+                } else {
+                    Default::default()
+                },
                 entry_point: "main".into(),
                 targets: vec![Some(ColorTargetState {
                     format: TextureFormat::Rgba8UnormSrgb,
@@ -312,6 +333,7 @@ impl PointCloudPipeline {
             eye_dome_image_layout,
             sampler,
             instanced_point_quad,
+            colored: false,
         }
     }
 }

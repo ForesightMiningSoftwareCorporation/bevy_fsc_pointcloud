@@ -107,6 +107,8 @@ impl AssetLoader for LasLoader {
             println!("Loaded asset, max {:?}, min {:?}", max.inner, min.inner);
             let asset = PointCloudAsset { mesh };
             load_context.set_default_asset(LoadedAsset::new(asset));
+
+            println!("Loaded");
             Ok(())
         })
     }

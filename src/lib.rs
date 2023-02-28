@@ -2,6 +2,7 @@ mod loader;
 mod pipeline;
 mod render;
 mod render_graph;
+mod opd_loader;
 
 use bevy::{
     asset::load_internal_asset,
@@ -15,18 +16,22 @@ use bevy::{
     },
 };
 pub use loader::*;
+pub use opd_loader::*;
 pub use pipeline::*;
 pub use render::*;
 pub use render_graph::*;
 
 #[derive(Default)]
-pub struct PointCloudPlugin;
+pub struct PointCloudPlugin {
+    pub colored: bool
+}
 
 impl Plugin for PointCloudPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        let point_cloud_pipeline = PointCloudPipeline::from_app(app);
+        let point_cloud_pipeline = PointCloudPipeline::from_app(app, self.colored);
         app.add_asset::<PointCloudAsset>()
             .add_asset_loader(LasLoader)
+            .add_asset_loader(OpdLoader)
             //.add_plugin(LookTransformPlugin)
             //.add_plugin(FpsCameraPlugin::default())
             .add_plugin(
