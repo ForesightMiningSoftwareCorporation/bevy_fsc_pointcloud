@@ -17,8 +17,6 @@ impl AssetLoader for OpdLoader {
         ) -> bevy::utils::BoxedFuture<'a, Result<(), bevy::asset::Error>> {
             Box::pin(async move {
                 let file = opd_parser::parse(bytes).unwrap().1;
-
-
                 let mut positions = Vec::new();
 
                 let mut max_position = [f32::MIN, f32::MIN, f32::MIN];
@@ -45,7 +43,7 @@ impl AssetLoader for OpdLoader {
                 let mut mesh = Mesh::new(PrimitiveTopology::PointList);
                 mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
 
-                let asset = PointCloudAsset { mesh };
+                let asset = PointCloudAsset { mesh, animation: Some(file.frames) };
                 load_context.set_default_asset(LoadedAsset::new(asset));
                 Ok(())
             })

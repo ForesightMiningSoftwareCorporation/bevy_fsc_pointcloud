@@ -19,6 +19,18 @@ layout(set = 2, binding = 0) uniform Model {
     float point_size;
 };
 
+struct PointOffset {
+    float position_x;
+    float position_y;
+    float position_z;
+};
+
+#ifdef ANIMATED
+layout(std430, set = 1, binding = 1) readonly buffer AnimationOffset {
+    PointOffset[] offsets;
+};
+#endif
+
 struct Point {
     float position_x;
     float position_y;
@@ -36,6 +48,13 @@ layout(std430, set = 1, binding = 0) readonly buffer Asset {
 
 void main() {
     Point p = points[gl_InstanceIndex];
+    #ifdef ANIMATED
+    PointOffset offset = offsets[gl_InstanceIndex];
+    p.position_x += offset.position_x;
+    p.position_y += offset.position_y;
+    p.position_z += offset.position_z;
+    #endif
+
     vec4 out_Pos = view_proj * model_transform * vec4(p.position_x, p.position_y, p.position_z, 1.0);
 
     #ifdef COLORED

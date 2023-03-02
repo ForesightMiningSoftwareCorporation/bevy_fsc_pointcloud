@@ -1,9 +1,10 @@
+
+#![feature(iter_array_chunks)]
 mod loader;
 mod pipeline;
 mod render;
 mod render_graph;
 mod opd_loader;
-
 use bevy::{
     asset::load_internal_asset,
     prelude::*,
@@ -23,12 +24,13 @@ pub use render_graph::*;
 
 #[derive(Default)]
 pub struct PointCloudPlugin {
-    pub colored: bool
+    pub colored: bool,
+    pub animated: bool
 }
 
 impl Plugin for PointCloudPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        let point_cloud_pipeline = PointCloudPipeline::from_app(app, self.colored);
+        let point_cloud_pipeline = PointCloudPipeline::from_app(app, self.colored, self.animated);
         app.add_asset::<PointCloudAsset>()
             .add_asset_loader(LasLoader)
             .add_asset_loader(OpdLoader)
@@ -46,6 +48,11 @@ impl Plugin for PointCloudPlugin {
         load_internal_asset!(app, POINT_CLOUD_FRAG_SHADER_HANDLE, "shader.frag", |s| {
             Shader::from_glsl(s, ShaderStage::Fragment)
         });
+        if self.animated {
+            load_internal_asset!(app, ANIMATION_COMPUTE_SHADER_HANDLE, "shader_animation.comp", |s| {
+                Shader::from_glsl(s, ShaderStage::Compute)
+            });
+        }
         load_internal_asset!(
             app,
             EYE_DOME_LIGHTING_SHADER_HANDLE,
@@ -58,6 +65,7 @@ impl Plugin for PointCloudPlugin {
             .add_system_to_stage(RenderStage::Extract, extract_point_cloud)
             .add_system_to_stage(RenderStage::Prepare, prepare_point_cloud_bind_group)
             .add_system_to_stage(RenderStage::Queue, prepare_view_targets)
+            .add_system_to_stage(RenderStage::Prepare, prepare_animated_assets)
             .init_resource::<PointCloudBindGroup>()
             .insert_resource(point_cloud_pipeline);
         let point_cloud_node = PointCloudNode::new(&mut render_app.world);

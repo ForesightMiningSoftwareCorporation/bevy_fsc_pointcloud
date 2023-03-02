@@ -13,7 +13,8 @@ use bevy::{
         Extract,
     },
 };
-
+use bevy::render::render_resource::BufferDescriptor;
+use opd_parser::Frames;
 #[derive(Component, Clone)]
 pub struct PotreePointCloud {
     pub mesh: Handle<PointCloudAsset>,
@@ -52,6 +53,14 @@ pub struct PreparedPointCloudAsset {
     pub buffer: Buffer,
     pub num_points: u32,
     pub bind_group: BindGroup,
+
+    pub animation_buffer: Option<Buffer>,
+    pub animation_buffer_staging: Option<Buffer>,
+    pub animation_upload_bindgroup: Option<BindGroup>,
+    pub frames: Option<Frames>,
+    pub current_animation_frame: usize,
+    pub requires_update: bool,
+    pub animation_start_time: f32,
 }
 
 impl RenderAsset for PointCloudAsset {
@@ -79,22 +88,71 @@ impl RenderAsset for PointCloudAsset {
             label: Some("Point cloud vertex buffer"),
             contents: extracted_asset.mesh.get_vertex_buffer_data().as_slice(),
         });
+
+        let mut animation_buffer = if extracted_asset.animation.is_some(){
+            Some(render_device.create_buffer(&BufferDescriptor {
+                label: None,
+                size: extracted_asset.mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len() as u64 * std::mem::size_of::<f32>() as u64 * 3,
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }))
+        } else {
+            None
+        };
+        let mut animation_buffer_staging = if extracted_asset.animation.is_some(){
+            Some(render_device.create_buffer(&BufferDescriptor {
+                label: None,
+                size: extracted_asset.mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len() as u64 * std::mem::size_of::<f32>() as u64 * 3,
+                usage: BufferUsages::COPY_DST | BufferUsages::STORAGE,
+                mapped_at_creation: false,
+            }))
+        } else {
+            None
+        };
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             label: "point cloud buffer bind group".into(),
             layout: &pipeline.entity_layout,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: bevy::render::render_resource::BindingResource::Buffer(BufferBinding {
-                    buffer: &buffer,
-                    offset: 0,
-                    size: None,
-                }),
-            }],
+            entries:
+                &[BindGroupEntry {
+                    binding: 0,
+                    resource: buffer.as_entire_binding()
+                },BindGroupEntry {
+                    binding: 1,
+                    resource: animation_buffer.as_ref().unwrap().as_entire_binding()
+                }].as_slice()[if extracted_asset.animation.is_some() {
+                    0..2
+                } else {
+                    0..1
+                }],
         });
+
+        let mut animation_upload_bindgroup: Option<BindGroup> = None;
+        if extracted_asset.animation.is_some() {
+            animation_upload_bindgroup = Some(render_device.create_bind_group(&BindGroupDescriptor {
+                label: "animation upload bind group".into(),
+                layout: &pipeline.animation_compute_layout,
+                entries:
+                    &[BindGroupEntry {
+                        binding: 0,
+                        resource: animation_buffer_staging.as_ref().unwrap().as_entire_binding()
+                    },BindGroupEntry {
+                        binding: 1,
+                        resource: animation_buffer.as_ref().unwrap().as_entire_binding()
+                    }],
+            }));
+        }
+        
         Ok(PreparedPointCloudAsset {
             buffer,
             num_points: extracted_asset.mesh.count_vertices() as u32,
             bind_group,
+            animation_buffer,
+            animation_buffer_staging,
+            animation_upload_bindgroup,
+            frames: extracted_asset.animation,
+            current_animation_frame: 0,
+            requires_update: false,
+            animation_start_time: 0.0
         })
     }
 }

@@ -12,7 +12,8 @@ fn main() {
         .add_plugin(FpsCameraPlugin::default())
         .insert_resource(Msaa { samples: 1 })
         .add_plugin(bevy_potree::PointCloudPlugin {
-            colored: false
+            colored: false,
+            animated: true
         })
         .add_startup_system(startup);
     app.insert_resource(PointCloudPipelineConfig {

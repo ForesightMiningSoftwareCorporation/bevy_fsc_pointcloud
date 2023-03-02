@@ -57,6 +57,9 @@ impl Node for PointCloudNode {
         world: &World,
     ) -> Result<(), bevy::render::render_graph::NodeRunError> {
         let view_entity = graph.get_input_entity(Self::IN_VIEW)?;
+        let point_cloud_pipeline = world.resource::<PointCloudPipeline>();
+        let pipeline_cache = world.resource::<PipelineCache>();
+        let render_assets = world.resource::<RenderAssets<PointCloudAsset>>();
         let (_view, target, _depth, view_uniform_offset, eye_dome_view_target) =
             match self.query.get_manual(world, view_entity) {
                 Ok(query) => query,
@@ -64,6 +67,42 @@ impl Node for PointCloudNode {
                     return Ok(());
                 } // No window
             };
+        
+        for (point_cloud_asset, dynamic_index) in self.entity_query.iter_manual(&world) {
+            let point_cloud_asset = render_assets.get(point_cloud_asset);
+            if point_cloud_asset.is_none() {
+                continue;
+            }
+            let point_cloud_asset = point_cloud_asset.unwrap();
+
+            if point_cloud_asset.current_animation_frame == 0 && point_cloud_asset.requires_update {
+                render_context.command_encoder.clear_buffer(point_cloud_asset.animation_buffer.as_ref().unwrap(), 0, None);
+            }
+        }
+        if let Some(animation_pipeline) = point_cloud_pipeline.animation_compute_pipeline_id.as_ref() {
+            let mut compute_pass = render_context.command_encoder.begin_compute_pass(&bevy::render::render_resource::ComputePassDescriptor {
+                label: None
+            });
+
+            if let Some(pipeline) = pipeline_cache.get_compute_pipeline(animation_pipeline.clone()) {
+                
+                compute_pass.set_pipeline(pipeline);
+                for (point_cloud_asset, dynamic_index) in self.entity_query.iter_manual(&world) {
+                    let point_cloud_asset = render_assets.get(point_cloud_asset);
+                    if point_cloud_asset.is_none() {
+                        continue;
+                    }
+                    let point_cloud_asset = point_cloud_asset.unwrap();
+                    if !point_cloud_asset.requires_update {
+                        continue;
+                    }
+                    compute_pass.set_bind_group(0, &point_cloud_asset.animation_upload_bindgroup.as_ref().unwrap(), &[]);
+                    compute_pass.dispatch_workgroups(point_cloud_asset.num_points / 128, 1, 1);
+                }
+            }
+        }
+
+
         let mut render_pass =
             render_context
                 .command_encoder
@@ -87,8 +126,6 @@ impl Node for PointCloudNode {
                     }),
                 });
 
-        let point_cloud_pipeline = world.resource::<PointCloudPipeline>();
-        let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline = pipeline_cache.get_render_pipeline(point_cloud_pipeline.pipeline_id);
         let eye_dome_pipeline =
             pipeline_cache.get_render_pipeline(point_cloud_pipeline.eye_dome_pipeline_id);
@@ -111,7 +148,6 @@ impl Node for PointCloudNode {
             &[view_uniform_offset.offset],
         );
         render_pass.set_vertex_buffer(0, *point_cloud_pipeline.instanced_point_quad.slice(0..32));
-        let render_assets = world.resource::<RenderAssets<PointCloudAsset>>();
         for (point_cloud_asset, dynamic_index) in self.entity_query.iter_manual(&world) {
             let point_cloud_asset = render_assets.get(point_cloud_asset);
             if point_cloud_asset.is_none() {
