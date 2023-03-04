@@ -61,6 +61,7 @@ pub struct PreparedPointCloudAsset {
     pub current_animation_frame: usize,
     pub requires_update: bool,
     pub animation_start_time: f32,
+    pub animation_scale: Vec3
 }
 
 impl RenderAsset for PointCloudAsset {
@@ -152,7 +153,8 @@ impl RenderAsset for PointCloudAsset {
             frames: extracted_asset.animation,
             current_animation_frame: 0,
             requires_update: false,
-            animation_start_time: 0.0
+            animation_start_time: 0.0,
+            animation_scale: extracted_asset.animation_scale
         })
     }
 }

@@ -494,15 +494,18 @@ pub fn prepare_animated_assets(
                         asset.animation_start_time = time.elapsed_seconds_wrapped();
                     }
 
+                    let scale: [f32; 3] = asset.animation_scale.into();
                     for mut arr in frames[asset.current_animation_frame].data.iter().enumerate().array_chunks::<3>() {
                         arr.swap(1, 2);
-                        for j in 0..2 {
+                        for j in 0..3 {
                             let (i, value) = arr[j];
                             let value = *value;
                             let value: i8 = unsafe { std::mem::transmute(value)};
                             let value: f32 = value as f32 / i8::MAX as f32;
                             let value = value * 0.1;
-                            view[i] = value;
+
+                            let scale = scale[j];
+                            view[i] = value * scale;
                         }
                     }
 

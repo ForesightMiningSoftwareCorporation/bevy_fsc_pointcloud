@@ -47,7 +47,8 @@ impl Point {
 #[uuid = "806a9a3b-04db-4e4e-b509-ab35ef3a6c43"]
 pub struct PointCloudAsset {
     pub mesh: Mesh,
-    pub animation: Option<Frames>
+    pub animation: Option<Frames>,
+    pub animation_scale: Vec3,
 }
 
 pub struct LasLoader;
@@ -107,7 +108,7 @@ impl AssetLoader for LasLoader {
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
             mesh.insert_attribute(ATTRIBUTE_COLOR, colors);
             println!("Loaded asset, max {:?}, min {:?}", max.inner, min.inner);
-            let asset = PointCloudAsset { mesh, animation: None };
+            let asset = PointCloudAsset { mesh, animation: None, animation_scale: Vec3::default() };
             load_context.set_default_asset(LoadedAsset::new(asset));
 
             println!("Loaded");
