@@ -495,7 +495,22 @@ pub fn prepare_animated_assets(
                     }
 
                     let scale: [f32; 3] = asset.animation_scale.into();
-                    for mut arr in frames[asset.current_animation_frame].data.iter().enumerate().array_chunks::<3>() {
+                    let mut iter = frames[asset.current_animation_frame].data.iter().enumerate();
+                    loop {
+                        let mut arr = [
+                            match iter.next() {
+                                Some(a) => a,
+                                None => break
+                            },
+                            match iter.next() {
+                                Some(a) => a,
+                                None => break
+                            },
+                            match iter.next() {
+                                Some(a) => a,
+                                None => break
+                            }
+                        ];
                         arr.swap(1, 2);
                         for j in 0..3 {
                             let (i, value) = arr[j];
@@ -507,7 +522,7 @@ pub fn prepare_animated_assets(
                             let scale = scale[j];
                             view[i] = value * scale;
                         }
-                    }
+                    };
 
                     frames.len()
                 },
