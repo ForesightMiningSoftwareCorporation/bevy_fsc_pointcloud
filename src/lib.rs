@@ -10,7 +10,7 @@ use bevy::{
         extract_component::{ExtractComponentPlugin, UniformComponentPlugin},
         render_asset::{PrepareAssetLabel, RenderAssetPlugin},
         render_graph::RenderGraph,
-        render_resource::ShaderStage,
+        render_resource::ShaderStage, 
         RenderApp, RenderStage,
     },
 };
