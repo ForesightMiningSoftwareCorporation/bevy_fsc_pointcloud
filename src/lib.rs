@@ -8,6 +8,7 @@ use bevy::{
     prelude::*,
     render::{
         extract_component::{ExtractComponentPlugin, UniformComponentPlugin},
+        extract_resource::ExtractResourcePlugin,
         render_asset::{PrepareAssetLabel, RenderAssetPlugin},
         render_graph::RenderGraph,
         render_resource::ShaderStage, 
@@ -40,6 +41,11 @@ impl Plugin for PointCloudPlugin {
                 ),
             )
             .add_plugin(UniformComponentPlugin::<PointCloudUniform>::default());
+        if self.animated {
+            app
+            .init_resource::<PointCloudPlaybackControl>()
+            .add_plugin(ExtractResourcePlugin::<PointCloudPlaybackControl>::default());
+        }
         load_internal_asset!(app, POINT_CLOUD_VERT_SHADER_HANDLE, "shader.vert", |s| {
             Shader::from_glsl(s, ShaderStage::Vertex)
         });

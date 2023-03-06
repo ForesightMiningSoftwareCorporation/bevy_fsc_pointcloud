@@ -22,7 +22,7 @@ use bevy::{
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, TextureCache},
         view::{ExtractedView, ViewTarget, ViewUniforms},
-        RenderApp, render_asset::RenderAssets,
+        RenderApp, render_asset::RenderAssets, extract_resource::ExtractResource,
     },
     utils::HashMap, animation,
 };
@@ -463,7 +463,7 @@ pub(crate) fn prepare_view_targets(
     }
 }
 
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct PointCloudPlaybackControl {
     pub playing: bool,
     progress: f32,
@@ -479,6 +479,15 @@ impl Default for PointCloudPlaybackControl {
             playing: true,
             progress: 0.0,
         }
+    }
+}
+
+impl ExtractResource for PointCloudPlaybackControl {
+    type Source = Self;
+
+    /// Defines how the resource is transferred into the "render world".
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
     }
 }
 
