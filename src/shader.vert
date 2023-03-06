@@ -48,19 +48,21 @@ layout(std430, set = 1, binding = 0) readonly buffer Asset {
 
 void main() {
     Point p = points[gl_InstanceIndex];
+
+    vec3 in_Pos = vec3(p.position_x, p.position_y, p.position_z);
     #ifdef ANIMATED
     PointOffset offset = offsets[gl_InstanceIndex];
-    p.position_x += offset.position_x;
-    p.position_y += offset.position_y;
-    p.position_z += offset.position_z;
+    in_Pos.x += offset.position_x;
+    in_Pos.y += offset.position_y;
+    in_Pos.z += offset.position_z;
     #endif
 
-    vec4 out_Pos = view_proj * model_transform * vec4(p.position_x, p.position_y, p.position_z, 1.0);
+    vec4 out_Pos = view_proj * model_transform * vec4(in_Pos, 1.0);
 
     #ifdef COLORED
     out_Color = vec3(p.color_r, p.color_g, p.color_b);
     #else
-    out_Color = vec3(p.position_x, p.position_y, p.position_z);
+    out_Color = vec3(p.position_x % 1.0, p.position_y % 1.0, p.position_z % 1.0);
     #endif
     
     float depth = out_Pos.w;

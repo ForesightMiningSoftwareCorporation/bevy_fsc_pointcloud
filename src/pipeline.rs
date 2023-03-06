@@ -35,8 +35,6 @@ pub(crate) const POINT_CLOUD_FRAG_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf02);
 pub(crate) const EYE_DOME_LIGHTING_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf03);
-pub(crate) const ANIMATION_COMPUTE_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf04);
 
 #[derive(Resource)]
 pub struct PointCloudPipeline {
@@ -47,9 +45,6 @@ pub struct PointCloudPipeline {
 
     pub eye_dome_pipeline_id: CachedRenderPipelineId,
     pub eye_dome_image_layout: BindGroupLayout,
-
-    pub animation_compute_layout: BindGroupLayout,
-    pub animation_compute_pipeline_id: Option<CachedComputePipelineId>,
 
     pub sampler: Sampler,
     pub instanced_point_quad: Buffer,
@@ -366,19 +361,6 @@ impl PointCloudPipeline {
         let eye_dome_pipeline_id =
             pipeline_cache.queue_render_pipeline(eye_dome_pipeline_descriptor);
 
-        let animation_compute_pipeline_id = if animated {
-            Some(pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
-            label: None,
-            layout: Some(vec! [
-                animation_compute_layout.clone()
-            ]),
-            shader: ANIMATION_COMPUTE_SHADER_HANDLE.typed(),
-            shader_defs: Vec::new(),
-            entry_point: "main".into(),
-        })) } else {
-            None
-        };
-
         Self {
             pipeline_id,
             view_layout,
@@ -390,8 +372,6 @@ impl PointCloudPipeline {
             instanced_point_quad,
             colored,
             animated,
-            animation_compute_layout,
-            animation_compute_pipeline_id
         }
     }
 }
@@ -502,21 +482,19 @@ pub fn prepare_animated_assets(
         return;
     }
     for (handle, asset) in assets.iter_mut() {
-        if let Some(staging) = asset.animation_buffer_staging.as_mut() {
+        if let Some(animation_buffer) = asset.animation_buffer.as_mut() {
             let size = asset.num_points as usize * std::mem::size_of::<f32>() * 3;
-            let mut view = queue.write_buffer_with(asset.animation_buffer_staging.as_ref().unwrap(), 0, NonZeroU64::new(size as u64).unwrap());
+            let mut view = queue.write_buffer_with(animation_buffer, 0, NonZeroU64::new(size as u64).unwrap());
             let view = &mut *view;
             let view = unsafe { std::slice::from_raw_parts_mut(view.as_mut_ptr() as *mut f32, asset.num_points as usize * std::mem::size_of::<f32>() * 3)};
             
             let frame_count = match asset.frames.as_ref().unwrap() {
-                opd_parser::Frames::U8(frames) => {
-                    let duration = frames.last().as_ref().unwrap().time / 1000.0;
+                opd_parser::Frames::I8(frames) => {
+                    let duration = frames.last().as_ref().unwrap().time / 5000.0;
                     let current_frame = &frames[asset.current_animation_frame];
-                    if current_frame.time / 1000.0 > time.elapsed_seconds_wrapped() - asset.animation_start_time {
-                        asset.requires_update = false;
+                    if current_frame.time / 5000.0 > time.elapsed_seconds_wrapped() - asset.animation_start_time {
                         continue;
                     }
-                    asset.requires_update = true;
                     playback.progress = (time.elapsed_seconds_wrapped() - asset.animation_start_time) / duration;
 
                     asset.current_animation_frame += 1;
@@ -530,25 +508,21 @@ pub fn prepare_animated_assets(
                     loop {
                         let mut arr = [
                             match iter.next() {
-                                Some(a) => a,
+                                Some(a) => (a.0, *a.1),
                                 None => break
                             },
                             match iter.next() {
-                                Some(a) => a,
+                                Some(a) => (a.0, *a.1),
                                 None => break
                             },
                             match iter.next() {
-                                Some(a) => a,
+                                Some(a) => (a.0, *a.1),
                                 None => break
                             }
                         ];
-                        arr.swap(1, 2);
                         for j in 0..3 {
                             let (i, value) = arr[j];
-                            let value = *value;
-                            let value: i8 = unsafe { std::mem::transmute(value)};
                             let value: f32 = value as f32 / i8::MAX as f32;
-                            let value = value * 0.1;
 
                             let scale = scale[j];
                             view[i] = value * scale;
@@ -557,9 +531,7 @@ pub fn prepare_animated_assets(
 
                     frames.len()
                 },
-                opd_parser::Frames::U16(_) => todo!(),
-                opd_parser::Frames::U32(_) => todo!(),
-                opd_parser::Frames::U64(_) => todo!(),
+                _ => todo!(),
             };
 
             

@@ -52,11 +52,6 @@ impl Plugin for PointCloudPlugin {
         load_internal_asset!(app, POINT_CLOUD_FRAG_SHADER_HANDLE, "shader.frag", |s| {
             Shader::from_glsl(s, ShaderStage::Fragment)
         });
-        if self.animated {
-            load_internal_asset!(app, ANIMATION_COMPUTE_SHADER_HANDLE, "shader_animation.comp", |s| {
-                Shader::from_glsl(s, ShaderStage::Compute)
-            });
-        }
         load_internal_asset!(
             app,
             EYE_DOME_LIGHTING_SHADER_HANDLE,

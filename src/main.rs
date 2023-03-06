@@ -23,12 +23,12 @@ fn main() {
 }
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let mesh: Handle<PointCloudAsset> = asset_server.load("replay.opd");
+    let mesh: Handle<PointCloudAsset> = asset_server.load("replay5.opd");
 
     commands
         .spawn(PotreePointCloud {
             mesh,
-            point_size: 0.007,
+            point_size: 2.0,
         })
         .insert(Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)))
         .insert(GlobalTransform::default());
@@ -40,7 +40,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         })
         .insert(FpsCameraBundle::new(
             Default::default(),
-            Vec3::new(3.0, 3.0, 3.0),
+            Vec3::new(30.0, 30.0, 30.0),
             Vec3::ZERO,
         ));
 }

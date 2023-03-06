@@ -26,21 +26,17 @@ impl OpdLoader {
                 positions.push(pos);
             }
 
-            println!("{:?}", file.header.directive.scale);
             let size = [max_position[0] - min_position[0], max_position[1] - min_position[1], max_position[2] - min_position[2]];
-
             for position in positions.iter_mut() {
                 for i in 0..3 {
-                    position[i] = (position[i] - min_position[i]) / size[i];
+                    position[i] = (position[i] - min_position[i] - size[i] / 2.0);
                 }
-                position.swap(1, 2);
             }
+
             let mut mesh = Mesh::new(PrimitiveTopology::PointList);
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
             
-
-            std::mem::swap(&mut  file.header.directive.scale.y, &mut  file.header.directive.scale.z);
-            let animation_scale =  file.header.directive.scale / Vec3::from(size);
+            let animation_scale =  file.header.directive.scale;
             let asset = PointCloudAsset {
                 mesh,
                 animation: Some(file.frames),
