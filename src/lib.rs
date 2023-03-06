@@ -63,9 +63,13 @@ impl Plugin for PointCloudPlugin {
             .add_system_to_stage(RenderStage::Extract, extract_point_cloud)
             .add_system_to_stage(RenderStage::Prepare, prepare_point_cloud_bind_group)
             .add_system_to_stage(RenderStage::Queue, prepare_view_targets)
-            .add_system_to_stage(RenderStage::Prepare, prepare_animated_assets)
             .init_resource::<PointCloudBindGroup>()
             .insert_resource(point_cloud_pipeline);
+        if self.animated {
+            render_app
+            .add_system_to_stage(RenderStage::Prepare, prepare_animated_assets)
+            .init_resource::<PointCloudPlaybackControl>();
+        }   
         let point_cloud_node = PointCloudNode::new(&mut render_app.world);
 
         let mut render_graph = render_app.world.resource_mut::<RenderGraph>();

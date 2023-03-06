@@ -463,13 +463,35 @@ pub(crate) fn prepare_view_targets(
     }
 }
 
+#[derive(Resource)]
+pub struct PointCloudPlaybackControl {
+    pub playing: bool,
+    progress: f32,
+}
+impl PointCloudPlaybackControl {
+    pub fn progress(&self) -> f32 {
+        self.progress
+    }
+}
+impl Default for PointCloudPlaybackControl {
+    fn default() -> Self {
+        Self {
+            playing: true,
+            progress: 0.0,
+        }
+    }
+}
 
 pub fn prepare_animated_assets(
     device: Res<RenderDevice>,
     queue: Res<RenderQueue>,
     mut assets: ResMut<RenderAssets<PointCloudAsset>>,
+    mut playback: ResMut<PointCloudPlaybackControl>,
     time: Res<Time>
 ) {
+    if !playback.playing {
+        return;
+    }
     for (handle, asset) in assets.iter_mut() {
         if let Some(staging) = asset.animation_buffer_staging.as_mut() {
             let size = asset.num_points as usize * std::mem::size_of::<f32>() * 3;
@@ -479,14 +501,14 @@ pub fn prepare_animated_assets(
             
             let frame_count = match asset.frames.as_ref().unwrap() {
                 opd_parser::Frames::U8(frames) => {
-                    let duration = frames.last().as_ref().unwrap().time / 10000.0;
+                    let duration = frames.last().as_ref().unwrap().time / 1000.0;
                     let current_frame = &frames[asset.current_animation_frame];
-                    if current_frame.time / 10000.0 > time.elapsed_seconds_wrapped() - asset.animation_start_time {
+                    if current_frame.time / 1000.0 > time.elapsed_seconds_wrapped() - asset.animation_start_time {
                         asset.requires_update = false;
                         continue;
                     }
                     asset.requires_update = true;
-                    println!("Updates");
+                    playback.progress = (time.elapsed_seconds_wrapped() - asset.animation_start_time) / duration;
 
                     asset.current_animation_frame += 1;
                     if asset.current_animation_frame >= frames.len() {
