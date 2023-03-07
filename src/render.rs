@@ -57,7 +57,7 @@ pub struct PreparedPointCloudAsset {
     pub animation_buffer: Option<Buffer>,
     pub frames: Option<Frames>,
     pub current_animation_frame: usize,
-    pub animation_start_time: f32,
+    pub animation_time: f32,
     pub animation_scale: Vec3
 }
 
@@ -89,7 +89,7 @@ impl RenderAsset for PointCloudAsset {
 
         let mut animation_buffer = if extracted_asset.animation.is_some(){
             Some(render_device.create_buffer(&BufferDescriptor {
-                label: None,
+                label: Some("AnimationBuffer"),
                 size: extracted_asset.mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len() as u64 * std::mem::size_of::<f32>() as u64 * 3,
                 usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
                 mapped_at_creation: false,
@@ -121,7 +121,7 @@ impl RenderAsset for PointCloudAsset {
             animation_buffer,
             frames: extracted_asset.animation,
             current_animation_frame: 0,
-            animation_start_time: 0.0,
+            animation_time: 0.0,
             animation_scale: extracted_asset.animation_scale
         })
     }

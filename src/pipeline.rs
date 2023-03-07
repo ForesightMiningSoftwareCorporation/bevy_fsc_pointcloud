@@ -446,18 +446,13 @@ pub(crate) fn prepare_view_targets(
 #[derive(Resource, Clone)]
 pub struct PointCloudPlaybackControl {
     pub playing: bool,
-    progress: f32,
-}
-impl PointCloudPlaybackControl {
-    pub fn progress(&self) -> f32 {
-        self.progress
-    }
+    pub speed: f32,
 }
 impl Default for PointCloudPlaybackControl {
     fn default() -> Self {
         Self {
             playing: true,
-            progress: 0.0,
+            speed: 5.0,
         }
     }
 }
@@ -484,23 +479,22 @@ pub fn prepare_animated_assets(
     for (handle, asset) in assets.iter_mut() {
         if let Some(animation_buffer) = asset.animation_buffer.as_mut() {
             let size = asset.num_points as usize * std::mem::size_of::<f32>() * 3;
-            let mut view = queue.write_buffer_with(animation_buffer, 0, NonZeroU64::new(size as u64).unwrap());
-            let view = &mut *view;
-            let view = unsafe { std::slice::from_raw_parts_mut(view.as_mut_ptr() as *mut f32, asset.num_points as usize * std::mem::size_of::<f32>() * 3)};
+            let mut view = vec![0.0; asset.num_points as usize * 3];
             
-            let frame_count = match asset.frames.as_ref().unwrap() {
+            match asset.frames.as_ref().unwrap() {
                 opd_parser::Frames::I8(frames) => {
-                    let duration = frames.last().as_ref().unwrap().time / 5000.0;
+                    let duration = frames.last().as_ref().unwrap().time / 1000.0;
                     let current_frame = &frames[asset.current_animation_frame];
-                    if current_frame.time / 5000.0 > time.elapsed_seconds_wrapped() - asset.animation_start_time {
+                    asset.animation_time += time.delta_seconds() * playback.speed;
+
+                    if current_frame.time / 1000.0 > asset.animation_time {
                         continue;
                     }
-                    playback.progress = (time.elapsed_seconds_wrapped() - asset.animation_start_time) / duration;
 
                     asset.current_animation_frame += 1;
                     if asset.current_animation_frame >= frames.len() {
                         asset.current_animation_frame = 0;
-                        asset.animation_start_time = time.elapsed_seconds_wrapped();
+                        asset.animation_time = 0.0;
                     }
 
                     let scale: [f32; 3] = asset.animation_scale.into();
@@ -533,8 +527,10 @@ pub fn prepare_animated_assets(
                 },
                 _ => todo!(),
             };
-
             
+            queue.write_buffer(animation_buffer, 0, unsafe {
+                std::slice::from_raw_parts(view.as_ptr() as *const u8, std::mem::size_of_val(view.as_slice()))
+            });
         }
     }
 }
