@@ -16,7 +16,7 @@ layout(set = 0, binding = 0) uniform View {
 
 layout(set = 2, binding = 0) uniform Model {
     mat4 model_transform;
-    float point_size;
+    float point_size_world_space;
 };
 
 struct PointOffset {
@@ -65,11 +65,23 @@ void main() {
     out_Color = vec3(p.position_x % 1.0, p.position_y % 1.0, p.position_z % 1.0);
     #endif
     
-    float depth = out_Pos.w;
-    float one_over_slope = projection[1][1]; // (0.5 * fov_y_radians).tan()
-    float height = viewport.w;
-    vec2 point_size = vec2(0.5 * point_size * one_over_slope);
-    point_size.y *= viewport.z / viewport.w;
+
+    vec2 point_size = vec2(0.0, 0.0);
+    if (projection[2][3] == -1.0) {
+        // perspective projection
+        float depth = out_Pos.w;
+        float one_over_slope = projection[1][1]; // (0.5 * fov_y_radians).tan()
+        point_size = vec2(0.5 * point_size_world_space * one_over_slope);
+        point_size.y *= viewport.z / viewport.w;
+    } else {
+        // orthographic projection
+        float a = 2.0 / projection[0][0]; // right - left
+        float b = 2.0 / projection[1][1]; // top - bottom
+        float max_scale = max(abs(a), abs(b));
+        point_size = vec2(point_size_world_space / max_scale);
+        point_size.y *= viewport.z / viewport.w;
+    }
+    
     out_Point_Location = in_Position_Point;
     gl_Position = out_Pos + vec4(in_Position_Point * point_size, 0.0, 0.0);
 }
