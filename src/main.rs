@@ -4,6 +4,7 @@ use smooth_bevy_cameras::{
     controllers::fps::{FpsCameraBundle, FpsCameraPlugin},
     LookTransformPlugin,
 };
+use smooth_bevy_cameras::controllers::fps::FpsCameraController;
 
 fn main() {
     let mut app = App::new();
@@ -30,6 +31,8 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
             mesh,
             point_size: 2.0,
         })
+        .insert(Visibility::default())
+        .insert(ComputedVisibility::default())
         .insert(Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)))
         .insert(GlobalTransform::default());
 
@@ -39,7 +42,10 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         })
         .insert(FpsCameraBundle::new(
-            Default::default(),
+            FpsCameraController {
+                translate_sensitivity: 20.0,
+                ..Default::default()
+            },
             Vec3::new(30.0, 30.0, 30.0),
             Vec3::ZERO,
         ));

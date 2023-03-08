@@ -21,7 +21,7 @@ use bevy::{
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, TextureCache},
-        view::{ExtractedView, ViewTarget, ViewUniforms},
+        view::{ExtractedView, ViewTarget, ViewUniforms, VisibleEntities},
         RenderApp, render_asset::RenderAssets, extract_resource::ExtractResource,
     },
     utils::HashMap, animation,
@@ -393,7 +393,10 @@ pub(crate) fn prepare_view_targets(
 ) {
     let msaa = msaa.map(|a| a.samples).unwrap_or(1);
     let mut textures = HashMap::default();
+
+    let mut cam_count = 0;
     for (entity, camera, _view, _view_target) in cameras.iter() {
+        cam_count += 1;
         if let Some(target_size) = camera.physical_target_size {
             let size = Extent3d {
                 width: target_size.x,
