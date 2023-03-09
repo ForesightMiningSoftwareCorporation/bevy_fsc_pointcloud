@@ -1,10 +1,9 @@
 use bevy::prelude::*;
-use bevy_potree::{PointCloudAsset, PotreePointCloud, PointCloudPipelineConfig};
+use bevy_potree::{PointCloudAsset, PointCloudPipelineConfig, PotreePointCloud};
 use smooth_bevy_cameras::{
     controllers::fps::{FpsCameraBundle, FpsCameraPlugin},
     LookTransformPlugin,
 };
-use smooth_bevy_cameras::controllers::fps::FpsCameraController;
 
 fn main() {
     let mut app = App::new();
@@ -14,12 +13,10 @@ fn main() {
         .insert_resource(Msaa { samples: 1 })
         .add_plugin(bevy_potree::PointCloudPlugin {
             colored: true,
-            animated: false
+            animated: false,
         })
         .add_startup_system(startup);
-    app.insert_resource(PointCloudPipelineConfig {
-        colored: false,
-    });
+    app.insert_resource(PointCloudPipelineConfig { colored: false });
     app.run();
 }
 

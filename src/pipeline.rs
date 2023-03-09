@@ -1,11 +1,11 @@
-use std::num::NonZeroU64;
-
 use bevy::{
     prelude::*,
     reflect::TypeUuid,
     render::{
         camera::ExtractedCamera,
         extract_component::ComponentUniforms,
+        extract_resource::ExtractResource,
+        render_asset::RenderAssets,
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendComponent,
@@ -17,17 +17,17 @@ use bevy::{
             SamplerDescriptor, ShaderStages, StencilFaceState, StencilState, Texture,
             TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
             TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat,
-            VertexState, VertexStepMode, CachedComputePipelineId, ComputePipelineDescriptor,
+            VertexState, VertexStepMode,
         },
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, TextureCache},
-        view::{ExtractedView, ViewTarget, ViewUniforms, VisibleEntities},
-        RenderApp, render_asset::RenderAssets, extract_resource::ExtractResource,
+        view::{ExtractedView, ViewTarget, ViewUniforms},
+        RenderApp,
     },
-    utils::HashMap, animation,
+    utils::HashMap,
 };
 
-use crate::{PointCloudUniform, pipeline, PointCloudAsset};
+use crate::{PointCloudAsset, PointCloudUniform};
 
 pub(crate) const POINT_CLOUD_VERT_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf01);
@@ -94,13 +94,11 @@ const QUAD_VERTEX_BUF: &'static [f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0
 
 #[derive(Clone, Resource)]
 pub struct PointCloudPipelineConfig {
-    pub colored: bool
+    pub colored: bool,
 }
 impl Default for PointCloudPipelineConfig {
     fn default() -> Self {
-        Self {
-            colored: true,
-        }
+        Self { colored: true }
     }
 }
 impl PointCloudPipeline {
@@ -142,29 +140,29 @@ impl PointCloudPipeline {
         });
         let entity_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("PointCloudViewLayout"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::VERTEX,
-                ty: BindingType::Buffer {
-                    ty: BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }, BindGroupLayoutEntry {
-                binding: 1,
-                visibility: ShaderStages::VERTEX,
-                ty: BindingType::Buffer {
-                    ty: BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }].as_slice()[if animated {
-                0..2
-            } else {
-                0..1
-            }],
+            ]
+            .as_slice()[if animated { 0..2 } else { 0..1 }],
         });
         let model_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("PointCloudModelLayout"),
@@ -201,25 +199,6 @@ impl PointCloudPipeline {
                     },
                 ],
             });
-            
-        let animation_compute_layout =
-        render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("AnimationComputeLayout"),
-            entries: &[
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::COMPUTE,
-                    ty: BindingType::Buffer { ty: BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None },
-                    count: None,
-                },
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::COMPUTE,
-                    ty: BindingType::Buffer { ty: BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None },
-                    count: None,
-                },
-            ],
-        });
         let pipeline_descriptor = RenderPipelineDescriptor {
             label: Some("point_cloud_pipeline".into()),
             layout: Some(vec![
@@ -231,8 +210,12 @@ impl PointCloudPipeline {
                 shader: POINT_CLOUD_VERT_SHADER_HANDLE.typed(),
                 shader_defs: {
                     let mut defs = Vec::new();
-                    if colored { defs.push("COLORED".to_string()) };
-                    if animated { defs.push("ANIMATED".to_string()) };
+                    if colored {
+                        defs.push("COLORED".to_string())
+                    };
+                    if animated {
+                        defs.push("ANIMATED".to_string())
+                    };
                     defs
                 },
                 entry_point: "main".into(),
@@ -250,8 +233,12 @@ impl PointCloudPipeline {
                 shader: POINT_CLOUD_FRAG_SHADER_HANDLE.typed(),
                 shader_defs: {
                     let mut defs = Vec::new();
-                    if colored { defs.push("COLORED".to_string()) };
-                    if animated { defs.push("ANIMATED".to_string()) };
+                    if colored {
+                        defs.push("COLORED".to_string())
+                    };
+                    if animated {
+                        defs.push("ANIMATED".to_string())
+                    };
                     defs
                 },
                 entry_point: "main".into(),
@@ -394,9 +381,7 @@ pub(crate) fn prepare_view_targets(
     let msaa = msaa.map(|a| a.samples).unwrap_or(1);
     let mut textures = HashMap::default();
 
-    let mut cam_count = 0;
     for (entity, camera, _view, _view_target) in cameras.iter() {
-        cam_count += 1;
         if let Some(target_size) = camera.physical_target_size {
             let size = Extent3d {
                 width: target_size.x,
@@ -470,23 +455,20 @@ impl ExtractResource for PointCloudPlaybackControl {
 }
 
 pub fn prepare_animated_assets(
-    device: Res<RenderDevice>,
     queue: Res<RenderQueue>,
     mut assets: ResMut<RenderAssets<PointCloudAsset>>,
-    mut playback: ResMut<PointCloudPlaybackControl>,
-    time: Res<Time>
+    playback: ResMut<PointCloudPlaybackControl>,
+    time: Res<Time>,
 ) {
     if !playback.playing {
         return;
     }
-    for (handle, asset) in assets.iter_mut() {
+    for (_handle, asset) in assets.iter_mut() {
         if let Some(animation_buffer) = asset.animation_buffer.as_mut() {
-            let size = asset.num_points as usize * std::mem::size_of::<f32>() * 3;
             let mut view = vec![0.0; asset.num_points as usize * 3];
-            
+
             match asset.frames.as_ref().unwrap() {
                 opd_parser::Frames::I8(frames) => {
-                    let duration = frames.last().as_ref().unwrap().time / 1000.0;
                     let current_frame = &frames[asset.current_animation_frame];
                     asset.animation_time += time.delta_seconds() * playback.speed;
 
@@ -501,21 +483,24 @@ pub fn prepare_animated_assets(
                     }
 
                     let scale: [f32; 3] = asset.animation_scale.into();
-                    let mut iter = frames[asset.current_animation_frame].data.iter().enumerate();
+                    let mut iter = frames[asset.current_animation_frame]
+                        .data
+                        .iter()
+                        .enumerate();
                     loop {
-                        let mut arr = [
+                        let arr = [
                             match iter.next() {
                                 Some(a) => (a.0, *a.1),
-                                None => break
+                                None => break,
                             },
                             match iter.next() {
                                 Some(a) => (a.0, *a.1),
-                                None => break
+                                None => break,
                             },
                             match iter.next() {
                                 Some(a) => (a.0, *a.1),
-                                None => break
-                            }
+                                None => break,
+                            },
                         ];
                         for j in 0..3 {
                             let (i, value) = arr[j];
@@ -524,15 +509,18 @@ pub fn prepare_animated_assets(
                             let scale = scale[j];
                             view[i] = value * scale;
                         }
-                    };
+                    }
 
                     frames.len()
-                },
+                }
                 _ => todo!(),
             };
-            
+
             queue.write_buffer(animation_buffer, 0, unsafe {
-                std::slice::from_raw_parts(view.as_ptr() as *const u8, std::mem::size_of_val(view.as_slice()))
+                std::slice::from_raw_parts(
+                    view.as_ptr() as *const u8,
+                    std::mem::size_of_val(view.as_slice()),
+                )
             });
         }
     }

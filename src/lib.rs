@@ -1,17 +1,17 @@
 mod loader;
+mod opd_loader;
 mod pipeline;
 mod render;
 mod render_graph;
-mod opd_loader;
 use bevy::{
     asset::load_internal_asset,
     prelude::*,
     render::{
-        extract_component::{ExtractComponentPlugin, UniformComponentPlugin},
+        extract_component::UniformComponentPlugin,
         extract_resource::ExtractResourcePlugin,
         render_asset::{PrepareAssetLabel, RenderAssetPlugin},
         render_graph::RenderGraph,
-        render_resource::ShaderStage, 
+        render_resource::ShaderStage,
         RenderApp, RenderStage,
     },
 };
@@ -24,7 +24,7 @@ pub use render_graph::*;
 #[derive(Default)]
 pub struct PointCloudPlugin {
     pub colored: bool,
-    pub animated: bool
+    pub animated: bool,
 }
 
 impl Plugin for PointCloudPlugin {
@@ -42,9 +42,8 @@ impl Plugin for PointCloudPlugin {
             )
             .add_plugin(UniformComponentPlugin::<PointCloudUniform>::default());
         if self.animated {
-            app
-            .init_resource::<PointCloudPlaybackControl>()
-            .add_plugin(ExtractResourcePlugin::<PointCloudPlaybackControl>::default());
+            app.init_resource::<PointCloudPlaybackControl>()
+                .add_plugin(ExtractResourcePlugin::<PointCloudPlaybackControl>::default());
         }
         load_internal_asset!(app, POINT_CLOUD_VERT_SHADER_HANDLE, "shader.vert", |s| {
             Shader::from_glsl(s, ShaderStage::Vertex)
@@ -68,9 +67,9 @@ impl Plugin for PointCloudPlugin {
             .insert_resource(point_cloud_pipeline);
         if self.animated {
             render_app
-            .add_system_to_stage(RenderStage::Prepare, prepare_animated_assets)
-            .init_resource::<PointCloudPlaybackControl>();
-        }   
+                .add_system_to_stage(RenderStage::Prepare, prepare_animated_assets)
+                .init_resource::<PointCloudPlaybackControl>();
+        }
         let point_cloud_node = PointCloudNode::new(&mut render_app.world);
 
         let mut render_graph = render_app.world.resource_mut::<RenderGraph>();

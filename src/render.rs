@@ -1,19 +1,18 @@
 use crate::{pipeline::PointCloudPipeline, PointCloudAsset};
+use bevy::render::render_resource::BufferDescriptor;
 use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     prelude::*,
     render::{
-        extract_component::{ComponentUniforms, ExtractComponent},
         render_asset::RenderAsset,
         render_resource::{
-            BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferBinding,
-            BufferInitDescriptor, BufferUsages, ShaderType,
+            BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferInitDescriptor,
+            BufferUsages, ShaderType,
         },
         renderer::RenderDevice,
         Extract,
     },
 };
-use bevy::render::render_resource::BufferDescriptor;
 use opd_parser::Frames;
 #[derive(Component, Clone)]
 pub struct PotreePointCloud {
@@ -58,7 +57,7 @@ pub struct PreparedPointCloudAsset {
     pub frames: Option<Frames>,
     pub current_animation_frame: usize,
     pub animation_time: f32,
-    pub animation_scale: Vec3
+    pub animation_scale: Vec3,
 }
 
 impl RenderAsset for PointCloudAsset {
@@ -87,34 +86,39 @@ impl RenderAsset for PointCloudAsset {
             contents: extracted_asset.mesh.get_vertex_buffer_data().as_slice(),
         });
 
-        let mut animation_buffer = if extracted_asset.animation.is_some(){
-            Some(render_device.create_buffer(&BufferDescriptor {
-                label: Some("AnimationBuffer"),
-                size: extracted_asset.mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len() as u64 * std::mem::size_of::<f32>() as u64 * 3,
-                usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }))
+        let animation_buffer = if extracted_asset.animation.is_some() {
+            Some(
+                render_device.create_buffer(&BufferDescriptor {
+                    label: Some("AnimationBuffer"),
+                    size: extracted_asset
+                        .mesh
+                        .attribute(Mesh::ATTRIBUTE_POSITION)
+                        .unwrap()
+                        .len() as u64
+                        * std::mem::size_of::<f32>() as u64
+                        * 3,
+                    usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                }),
+            )
         } else {
             None
         };
 
-        let mut bind_group_entires = vec![
-            BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding()
-            }
-        ];
+        let mut bind_group_entires = vec![BindGroupEntry {
+            binding: 0,
+            resource: buffer.as_entire_binding(),
+        }];
         if let Some(animation_buffer) = animation_buffer.as_ref() {
             bind_group_entires.push(BindGroupEntry {
                 binding: 1,
-                resource: animation_buffer.as_entire_binding()
+                resource: animation_buffer.as_entire_binding(),
             });
         }
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             label: "point cloud buffer bind group".into(),
             layout: &pipeline.entity_layout,
-            entries:
-                &bind_group_entires,
+            entries: &bind_group_entires,
         });
 
         Ok(PreparedPointCloudAsset {
@@ -125,7 +129,7 @@ impl RenderAsset for PointCloudAsset {
             frames: extracted_asset.animation,
             current_animation_frame: 0,
             animation_time: 0.0,
-            animation_scale: extracted_asset.animation_scale
+            animation_scale: extracted_asset.animation_scale,
         })
     }
 }

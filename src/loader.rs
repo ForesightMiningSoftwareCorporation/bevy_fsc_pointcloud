@@ -108,7 +108,11 @@ impl AssetLoader for LasLoader {
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
             mesh.insert_attribute(ATTRIBUTE_COLOR, colors);
             println!("Loaded asset, max {:?}, min {:?}", max.inner, min.inner);
-            let asset = PointCloudAsset { mesh, animation: None, animation_scale: Vec3::default() };
+            let asset = PointCloudAsset {
+                mesh,
+                animation: None,
+                animation_scale: Vec3::default(),
+            };
             load_context.set_default_asset(LoadedAsset::new(asset));
 
             println!("Loaded");
