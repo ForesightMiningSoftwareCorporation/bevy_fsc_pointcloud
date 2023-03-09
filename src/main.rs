@@ -13,8 +13,8 @@ fn main() {
         .add_plugin(FpsCameraPlugin::default())
         .insert_resource(Msaa { samples: 1 })
         .add_plugin(bevy_potree::PointCloudPlugin {
-            colored: false,
-            animated: true
+            colored: true,
+            animated: false
         })
         .add_startup_system(startup);
     app.insert_resource(PointCloudPipelineConfig {
@@ -24,12 +24,12 @@ fn main() {
 }
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let mesh: Handle<PointCloudAsset> = asset_server.load("replay5.opd");
+    let mesh: Handle<PointCloudAsset> = asset_server.load("laman_mahkota.laz");
 
     commands
         .spawn(PotreePointCloud {
             mesh,
-            point_size: 2.0,
+            point_size: 0.003,
         })
         .insert(Visibility::default())
         .insert(ComputedVisibility::default())
@@ -42,11 +42,8 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
             ..default()
         })
         .insert(FpsCameraBundle::new(
-            FpsCameraController {
-                translate_sensitivity: 20.0,
-                ..Default::default()
-            },
-            Vec3::new(30.0, 30.0, 30.0),
+            Default::default(),
+            Vec3::new(3.0, 3.0, 3.0),
             Vec3::ZERO,
         ));
 }

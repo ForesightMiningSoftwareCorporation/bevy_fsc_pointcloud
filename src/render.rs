@@ -97,21 +97,24 @@ impl RenderAsset for PointCloudAsset {
         } else {
             None
         };
+
+        let mut bind_group_entires = vec![
+            BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding()
+            }
+        ];
+        if let Some(animation_buffer) = animation_buffer.as_ref() {
+            bind_group_entires.push(BindGroupEntry {
+                binding: 1,
+                resource: animation_buffer.as_entire_binding()
+            });
+        }
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             label: "point cloud buffer bind group".into(),
             layout: &pipeline.entity_layout,
             entries:
-                &[BindGroupEntry {
-                    binding: 0,
-                    resource: buffer.as_entire_binding()
-                },BindGroupEntry {
-                    binding: 1,
-                    resource: animation_buffer.as_ref().unwrap().as_entire_binding()
-                }].as_slice()[if extracted_asset.animation.is_some() {
-                    0..2
-                } else {
-                    0..1
-                }],
+                &bind_group_entires,
         });
 
         Ok(PreparedPointCloudAsset {
