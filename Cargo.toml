@@ -8,5 +8,9 @@ edition = "2021"
 [dependencies]
 bevy = "0.9"
 opd-parser = { git = "https://github.com/ForesightMiningSoftwareCorporation/opd_parser" }
+anyhow = "*"
 las = { version = "0.8", features = ["laz"] }
+
+[dev-dependencies]
 smooth-bevy-cameras = { git = "https://github.com/olegomon/smooth-bevy-cameras" }
+

@@ -92,15 +92,6 @@ pub(crate) fn prepare_point_cloud_bind_group(
 
 const QUAD_VERTEX_BUF: &'static [f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
 
-#[derive(Clone, Resource)]
-pub struct PointCloudPipelineConfig {
-    pub colored: bool,
-}
-impl Default for PointCloudPipelineConfig {
-    fn default() -> Self {
-        Self { colored: true }
-    }
-}
 impl PointCloudPipeline {
     pub fn from_app(app: &mut App, colored: bool, animated: bool) -> Self {
         let msaa = app
@@ -211,11 +202,11 @@ impl PointCloudPipeline {
                 shader_defs: {
                     let mut defs = Vec::new();
                     if colored {
-                        defs.push("COLORED".to_string())
-                    };
+                        defs.push("COLORED".to_string());
+                    }
                     if animated {
-                        defs.push("ANIMATED".to_string())
-                    };
+                        defs.push("ANIMATED".to_string());
+                    }
                     defs
                 },
                 entry_point: "main".into(),
@@ -234,11 +225,11 @@ impl PointCloudPipeline {
                 shader_defs: {
                     let mut defs = Vec::new();
                     if colored {
-                        defs.push("COLORED".to_string())
-                    };
+                        defs.push("COLORED".to_string());
+                    }
                     if animated {
-                        defs.push("ANIMATED".to_string())
-                    };
+                        defs.push("ANIMATED".to_string());
+                    }
                     defs
                 },
                 entry_point: "main".into(),
@@ -448,7 +439,6 @@ impl Default for PointCloudPlaybackControl {
 impl ExtractResource for PointCloudPlaybackControl {
     type Source = Self;
 
-    /// Defines how the resource is transferred into the "render world".
     fn extract_resource(source: &Self::Source) -> Self {
         source.clone()
     }

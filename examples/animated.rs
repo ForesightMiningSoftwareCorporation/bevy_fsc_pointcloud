@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_potree::{PointCloudAsset, PointCloudPipelineConfig, PotreePointCloud};
+use bevy_potree::{PointCloudAsset, PotreePointCloud};
 use smooth_bevy_cameras::{
     controllers::fps::{FpsCameraBundle, FpsCameraPlugin},
     LookTransformPlugin,
@@ -12,26 +12,22 @@ fn main() {
         .add_plugin(FpsCameraPlugin::default())
         .insert_resource(Msaa { samples: 1 })
         .add_plugin(bevy_potree::PointCloudPlugin {
-            colored: true,
-            animated: false,
+            colored: false,
+            animated: true,
         })
         .add_startup_system(startup);
-    app.insert_resource(PointCloudPipelineConfig { colored: false });
     app.run();
 }
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let mesh: Handle<PointCloudAsset> = asset_server.load("laman_mahkota.laz");
+    let mesh: Handle<PointCloudAsset> = asset_server.load("replay.opd");
 
     commands
         .spawn(PotreePointCloud {
             mesh,
-            point_size: 0.003,
+            point_size: 3.0,
         })
-        .insert(Visibility::default())
-        .insert(ComputedVisibility::default())
-        .insert(Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)))
-        .insert(GlobalTransform::default());
+        .insert(SpatialBundle::default());
 
     commands
         .spawn(Camera3dBundle {
@@ -40,7 +36,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
         })
         .insert(FpsCameraBundle::new(
             Default::default(),
-            Vec3::new(3.0, 3.0, 3.0),
+            Vec3::new(30.0, 30.0, 30.0),
             Vec3::ZERO,
         ));
 }
