@@ -1,4 +1,6 @@
-mod loader;
+#[cfg(feature = "las")]
+mod las_loader;
+#[cfg(feature = "opd")]
 mod opd_loader;
 mod pipeline;
 mod render;
@@ -15,7 +17,9 @@ use bevy::{
         RenderApp, RenderStage,
     },
 };
-pub use loader::*;
+#[cfg(feature = "las")]
+pub use las_loader::*;
+#[cfg(feature = "opd")]
 pub use opd_loader::*;
 pub use pipeline::*;
 pub use render::*;
@@ -30,17 +34,18 @@ pub struct PointCloudPlugin {
 impl Plugin for PointCloudPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         let point_cloud_pipeline = PointCloudPipeline::from_app(app, self.colored, self.animated);
-        app.add_asset::<PointCloudAsset>()
-            .add_asset_loader(LasLoader)
-            .add_asset_loader(OpdLoader)
-            //.add_plugin(LookTransformPlugin)
-            //.add_plugin(FpsCameraPlugin::default())
-            .add_plugin(
-                RenderAssetPlugin::<PointCloudAsset>::with_prepare_asset_label(
-                    PrepareAssetLabel::AssetPrepare,
-                ),
-            )
-            .add_plugin(UniformComponentPlugin::<PointCloudUniform>::default());
+        app.add_asset::<PointCloudAsset>();
+
+        #[cfg(feature = "las")]
+        app.add_asset_loader(LasLoader);
+        #[cfg(feature = "opd")]
+        app.add_asset_loader(OpdLoader);
+        app.add_plugin(
+            RenderAssetPlugin::<PointCloudAsset>::with_prepare_asset_label(
+                PrepareAssetLabel::AssetPrepare,
+            ),
+        )
+        .add_plugin(UniformComponentPlugin::<PointCloudUniform>::default());
         if self.animated {
             app.init_resource::<PointCloudPlaybackControl>()
                 .add_plugin(ExtractResourcePlugin::<PointCloudPlaybackControl>::default());

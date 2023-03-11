@@ -16,7 +16,7 @@ impl OpdLoader {
 
         for i in file.centroids.into_iter() {
             let pos: [f32; 3] = i.offset.into();
-            
+
             max_position = max_position.max(i.offset.into());
             min_position = min_position.min(i.offset.into());
             positions.push(pos);
