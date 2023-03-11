@@ -9,25 +9,21 @@ pub struct OpdLoader;
 impl OpdLoader {
     pub async fn load_opd<'a>(bytes: &'a [u8]) -> Result<PointCloudAsset, anyhow::Error> {
         let file = opd_parser::parse(bytes).map_err(|e| e.to_owned())?.1;
-        let mut positions = Vec::new();
+        let mut positions: Vec<Vec3A> = Vec::new();
 
-        let mut max_position = Vec3A::new(f32::MIN, f32::MIN, f32::MIN);
-        let mut min_position = Vec3A::new(f32::MAX, f32::MAX, f32::MAX);
+        let mut max_position = Vec3A::splat(f32::MIN);
+        let mut min_position = Vec3A::splat(f32::MAX);
 
-        for i in file.centroids.into_iter() {
-            let pos: [f32; 3] = i.offset.into();
-
+        for i in file.centroids {
             max_position = max_position.max(i.offset.into());
             min_position = min_position.min(i.offset.into());
-            positions.push(pos);
+            positions.push(i.offset.into());
         }
 
         let size = max_position - min_position;
-        let position_offset: [f32; 3] = (min_position + size / 2.0).into();
+        let position_offset: Vec3A = min_position + size / 2.0;
         for position in positions.iter_mut() {
-            for i in 0..3 {
-                position[i] = position[i] - position_offset[i];
-            }
+            *position -= position_offset;
         }
 
         let mut mesh = Mesh::new(PrimitiveTopology::PointList);
