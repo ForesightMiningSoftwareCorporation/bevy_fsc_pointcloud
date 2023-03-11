@@ -477,31 +477,13 @@ pub fn prepare_animated_assets(
                         .data
                         .iter()
                         .enumerate();
-                    loop {
-                        let arr = [
-                            match iter.next() {
-                                Some(a) => (a.0, *a.1),
-                                None => break,
-                            },
-                            match iter.next() {
-                                Some(a) => (a.0, *a.1),
-                                None => break,
-                            },
-                            match iter.next() {
-                                Some(a) => (a.0, *a.1),
-                                None => break,
-                            },
-                        ];
+                    for (i, arr) in frames[asset.current_animation_frame].frame_as_vec3a().enumerate() {
+                        let arr = arr * asset.animation_scale;
+                        let arr: [f32; 3] = arr.into();
                         for j in 0..3 {
-                            let (i, value) = arr[j];
-                            let value: f32 = value as f32 / i8::MAX as f32;
-
-                            let scale = scale[j];
-                            view[i] = value * scale;
+                            view[i * 3 + j] = arr[j];
                         }
                     }
-
-                    frames.len()
                 }
                 _ => todo!(),
             };
