@@ -4,6 +4,8 @@ use bevy::{
     render::{
         camera::ExtractedCamera,
         extract_component::ComponentUniforms,
+        extract_resource::ExtractResource,
+        render_asset::RenderAssets,
         render_resource::{
             BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
             BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendComponent,
@@ -17,7 +19,7 @@ use bevy::{
             TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat,
             VertexState, VertexStepMode,
         },
-        renderer::RenderDevice,
+        renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, TextureCache},
         view::{ExtractedView, ViewTarget, ViewUniforms},
         RenderApp,
@@ -25,7 +27,7 @@ use bevy::{
     utils::HashMap,
 };
 
-use crate::PointCloudUniform;
+use crate::{PointCloudAsset, PointCloudUniform};
 
 pub(crate) const POINT_CLOUD_VERT_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf01);
@@ -46,6 +48,9 @@ pub struct PointCloudPipeline {
 
     pub sampler: Sampler,
     pub instanced_point_quad: Buffer,
+
+    pub colored: bool,
+    pub animated: bool,
 }
 
 #[derive(Resource, Default)]
@@ -88,7 +93,7 @@ pub(crate) fn prepare_point_cloud_bind_group(
 const QUAD_VERTEX_BUF: &'static [f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
 
 impl PointCloudPipeline {
-    pub fn from_app(app: &mut App) -> Self {
+    pub fn from_app(app: &mut App, colored: bool, animated: bool) -> Self {
         let msaa = app
             .world
             .get_resource::<Msaa>()
@@ -126,16 +131,29 @@ impl PointCloudPipeline {
         });
         let entity_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("PointCloudViewLayout"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::VERTEX,
-                ty: BindingType::Buffer {
-                    ty: BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ]
+            .as_slice()[if animated { 0..2 } else { 0..1 }],
         });
         let model_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("PointCloudModelLayout"),
@@ -181,7 +199,16 @@ impl PointCloudPipeline {
             ]),
             vertex: VertexState {
                 shader: POINT_CLOUD_VERT_SHADER_HANDLE.typed(),
-                shader_defs: Default::default(),
+                shader_defs: {
+                    let mut defs = Vec::new();
+                    if colored {
+                        defs.push("COLORED".to_string());
+                    }
+                    if animated {
+                        defs.push("ANIMATED".to_string());
+                    }
+                    defs
+                },
                 entry_point: "main".into(),
                 buffers: vec![VertexBufferLayout {
                     array_stride: 8,
@@ -195,7 +222,16 @@ impl PointCloudPipeline {
             },
             fragment: Some(FragmentState {
                 shader: POINT_CLOUD_FRAG_SHADER_HANDLE.typed(),
-                shader_defs: Default::default(),
+                shader_defs: {
+                    let mut defs = Vec::new();
+                    if colored {
+                        defs.push("COLORED".to_string());
+                    }
+                    if animated {
+                        defs.push("ANIMATED".to_string());
+                    }
+                    defs
+                },
                 entry_point: "main".into(),
                 targets: vec![Some(ColorTargetState {
                     format: TextureFormat::Rgba8UnormSrgb,
@@ -312,6 +348,8 @@ impl PointCloudPipeline {
             eye_dome_image_layout,
             sampler,
             instanced_point_quad,
+            colored,
+            animated,
         }
     }
 }
@@ -333,6 +371,7 @@ pub(crate) fn prepare_view_targets(
 ) {
     let msaa = msaa.map(|a| a.samples).unwrap_or(1);
     let mut textures = HashMap::default();
+
     for (entity, camera, _view, _view_target) in cameras.iter() {
         if let Some(target_size) = camera.physical_target_size {
             let size = Extent3d {
@@ -379,6 +418,82 @@ pub(crate) fn prepare_view_targets(
             });
 
             commands.entity(entity).insert(main_textures.clone());
+        }
+    }
+}
+
+#[derive(Resource, Clone)]
+pub struct PointCloudPlaybackControl {
+    pub playing: bool,
+    pub speed: f32,
+}
+impl Default for PointCloudPlaybackControl {
+    fn default() -> Self {
+        Self {
+            playing: true,
+            speed: 5.0,
+        }
+    }
+}
+
+impl ExtractResource for PointCloudPlaybackControl {
+    type Source = Self;
+
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
+    }
+}
+
+pub fn prepare_animated_assets(
+    queue: Res<RenderQueue>,
+    mut assets: ResMut<RenderAssets<PointCloudAsset>>,
+    playback: ResMut<PointCloudPlaybackControl>,
+    time: Res<Time>,
+) {
+    if !playback.playing {
+        return;
+    }
+    for (_handle, asset) in assets.iter_mut() {
+        if let Some(animation_buffer) = asset.animation_buffer.as_mut() {
+            let mut view = vec![0.0; asset.num_points as usize * 3];
+
+            match asset.frames.as_ref().unwrap() {
+                opd_parser::Frames::I8(frames) => {
+                    let current_frame = &frames[asset.current_animation_frame];
+                    asset.animation_time += time.delta_seconds() * playback.speed;
+
+                    if current_frame.time / 1000.0 > asset.animation_time {
+                        continue;
+                    }
+
+                    asset.current_animation_frame += 1;
+                    if asset.current_animation_frame >= frames.len() {
+                        asset.current_animation_frame = 0;
+                        asset.animation_time = 0.0;
+                    }
+
+                    let scale: [f32; 3] = asset.animation_scale.into();
+                    let mut iter = frames[asset.current_animation_frame]
+                        .data
+                        .iter()
+                        .enumerate();
+                    for (i, arr) in frames[asset.current_animation_frame].frame_as_vec3a().enumerate() {
+                        let arr = arr * asset.animation_scale;
+                        let arr: [f32; 3] = arr.into();
+                        for j in 0..3 {
+                            view[i * 3 + j] = arr[j];
+                        }
+                    }
+                }
+                _ => todo!(),
+            };
+
+            queue.write_buffer(animation_buffer, 0, unsafe {
+                std::slice::from_raw_parts(
+                    view.as_ptr() as *const u8,
+                    std::mem::size_of_val(view.as_slice()),
+                )
+            });
         }
     }
 }

@@ -5,7 +5,16 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["opd", "las"]
+opd = ["opd-parser"]
+
 [dependencies]
 bevy = "0.9"
-las = { version = "0.8", features = ["laz"] }
+opd-parser = { git = "https://github.com/ForesightMiningSoftwareCorporation/opd_parser", optional = true }
+anyhow = "1"
+las = { version = "0.8", features = ["laz"], optional = true }
+
+[dev-dependencies]
 smooth-bevy-cameras = { git = "https://github.com/olegomon/smooth-bevy-cameras" }
+

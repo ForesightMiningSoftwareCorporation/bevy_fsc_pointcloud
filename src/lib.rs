@@ -1,40 +1,55 @@
-mod loader;
+#[cfg(feature = "las")]
+mod las_loader;
+#[cfg(feature = "opd")]
+mod opd_loader;
 mod pipeline;
 mod render;
 mod render_graph;
-
 use bevy::{
     asset::load_internal_asset,
     prelude::*,
     render::{
-        extract_component::{ExtractComponentPlugin, UniformComponentPlugin},
+        extract_component::UniformComponentPlugin,
+        extract_resource::ExtractResourcePlugin,
         render_asset::{PrepareAssetLabel, RenderAssetPlugin},
         render_graph::RenderGraph,
         render_resource::ShaderStage,
         RenderApp, RenderStage,
     },
 };
-pub use loader::*;
+#[cfg(feature = "las")]
+pub use las_loader::*;
+#[cfg(feature = "opd")]
+pub use opd_loader::*;
 pub use pipeline::*;
 pub use render::*;
 pub use render_graph::*;
 
 #[derive(Default)]
-pub struct PointCloudPlugin;
+pub struct PointCloudPlugin {
+    pub colored: bool,
+    pub animated: bool,
+}
 
 impl Plugin for PointCloudPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        let point_cloud_pipeline = PointCloudPipeline::from_app(app);
-        app.add_asset::<PointCloudAsset>()
-            .add_asset_loader(LasLoader)
-            //.add_plugin(LookTransformPlugin)
-            //.add_plugin(FpsCameraPlugin::default())
-            .add_plugin(
-                RenderAssetPlugin::<PointCloudAsset>::with_prepare_asset_label(
-                    PrepareAssetLabel::AssetPrepare,
-                ),
-            )
-            .add_plugin(UniformComponentPlugin::<PointCloudUniform>::default());
+        let point_cloud_pipeline = PointCloudPipeline::from_app(app, self.colored, self.animated);
+        app.add_asset::<PointCloudAsset>();
+
+        #[cfg(feature = "las")]
+        app.add_asset_loader(LasLoader);
+        #[cfg(feature = "opd")]
+        app.add_asset_loader(OpdLoader);
+        app.add_plugin(
+            RenderAssetPlugin::<PointCloudAsset>::with_prepare_asset_label(
+                PrepareAssetLabel::AssetPrepare,
+            ),
+        )
+        .add_plugin(UniformComponentPlugin::<PointCloudUniform>::default());
+        if self.animated {
+            app.init_resource::<PointCloudPlaybackControl>()
+                .add_plugin(ExtractResourcePlugin::<PointCloudPlaybackControl>::default());
+        }
         load_internal_asset!(app, POINT_CLOUD_VERT_SHADER_HANDLE, "shader.vert", |s| {
             Shader::from_glsl(s, ShaderStage::Vertex)
         });
@@ -55,6 +70,11 @@ impl Plugin for PointCloudPlugin {
             .add_system_to_stage(RenderStage::Queue, prepare_view_targets)
             .init_resource::<PointCloudBindGroup>()
             .insert_resource(point_cloud_pipeline);
+        if self.animated {
+            render_app
+                .add_system_to_stage(RenderStage::Prepare, prepare_animated_assets)
+                .init_resource::<PointCloudPlaybackControl>();
+        }
         let point_cloud_node = PointCloudNode::new(&mut render_app.world);
 
         let mut render_graph = render_app.world.resource_mut::<RenderGraph>();

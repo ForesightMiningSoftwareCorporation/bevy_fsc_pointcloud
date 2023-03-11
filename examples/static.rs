@@ -11,7 +11,10 @@ fn main() {
         .add_plugin(LookTransformPlugin)
         .add_plugin(FpsCameraPlugin::default())
         .insert_resource(Msaa { samples: 1 })
-        .add_plugin(bevy_potree::PointCloudPlugin::default())
+        .add_plugin(bevy_potree::PointCloudPlugin {
+            colored: true,
+            animated: false,
+        })
         .add_startup_system(startup);
     app.run();
 }
@@ -22,10 +25,9 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn(PotreePointCloud {
             mesh,
-            point_size: 0.001,
+            point_size: 0.007,
         })
-        .insert(Transform::from_translation(Vec3::new(3.0, 0.0, 0.0)))
-        .insert(GlobalTransform::default());
+        .insert(SpatialBundle::default());
 
     commands
         .spawn(Camera3dBundle {
