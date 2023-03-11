@@ -2359,7 +2359,7 @@ checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
 [[package]]
 name = "opd-parser"
 version = "0.1.0"
-source = "git+https://github.com/ForesightMiningSoftwareCorporation/opd_parser#85416a0569d9dae4898271cb04fe16507d138195"
+source = "git+https://github.com/ForesightMiningSoftwareCorporation/opd_parser#a5ccb1ae5c11f44b4543f1bf9b6f675ea46e24d5"
 dependencies = [
  "glam 0.22.0",
  "nom",
