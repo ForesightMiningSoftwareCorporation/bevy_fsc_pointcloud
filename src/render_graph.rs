@@ -1,8 +1,19 @@
+use crate::pipeline::{EyeDomeViewTarget, PointCloudBindGroup, PointCloudPipeline};
+use crate::{PointCloudAsset, PointCloudUniform};
 use bevy::core_pipeline::core_3d::MainPass3dNode;
 use bevy::prelude::*;
 use bevy::render::extract_component::DynamicUniformIndex;
+use bevy::render::render_asset::RenderAssets;
+use bevy::render::render_graph::{Node, SlotInfo, SlotType};
+use bevy::render::render_resource::{
+    LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment, RenderPassDescriptor,
+};
+use bevy::render::view::{
+    ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset, VisibleEntities,
+};
 
 pub struct PointCloudNode {
+    #[allow(clippy::type_complexity)]
     query: QueryState<
         (
             &'static ExtractedView,
@@ -33,17 +44,6 @@ impl PointCloudNode {
     }
 }
 
-use bevy::render::render_asset::RenderAssets;
-use bevy::render::render_graph::{Node, SlotInfo, SlotType};
-use bevy::render::render_resource::{
-    LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment, RenderPassDescriptor,
-};
-use bevy::render::view::{
-    ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset, VisibleEntities,
-};
-
-use crate::pipeline::{EyeDomeViewTarget, PointCloudBindGroup, PointCloudPipeline};
-use crate::{PointCloudAsset, PointCloudUniform};
 impl Node for PointCloudNode {
     fn input(&self) -> Vec<SlotInfo> {
         vec![SlotInfo::new(MainPass3dNode::IN_VIEW, SlotType::Entity)]
@@ -99,7 +99,7 @@ impl Node for PointCloudNode {
         let eye_dome_pipeline =
             pipeline_cache.get_render_pipeline(point_cloud_pipeline.eye_dome_pipeline_id);
         if pipeline.is_none() || eye_dome_pipeline.is_none() {
-            println!("No pipeline");
+            warn!("No pipeline");
             return Ok(());
         }
         let pipeline = pipeline.unwrap();
@@ -108,16 +108,16 @@ impl Node for PointCloudNode {
         render_pass.set_pipeline(pipeline);
         let bind_groups = world.resource::<PointCloudBindGroup>();
         if bind_groups.bind_group.is_none() || bind_groups.model_bind_group.is_none() {
-            println!("No bind group");
+            warn!("No bind group");
             return Ok(());
         }
         render_pass.set_bind_group(
             0,
-            &bind_groups.bind_group.as_ref().unwrap(),
+            bind_groups.bind_group.as_ref().unwrap(),
             &[view_uniform_offset.offset],
         );
         render_pass.set_vertex_buffer(0, *point_cloud_pipeline.instanced_point_quad.slice(0..32));
-        for (entity, point_cloud_asset, dynamic_index) in self.entity_query.iter_manual(&world) {
+        for (entity, point_cloud_asset, dynamic_index) in self.entity_query.iter_manual(world) {
             if !visible_entities.entities.contains(&entity) {
                 continue;
             }
@@ -130,7 +130,7 @@ impl Node for PointCloudNode {
 
             render_pass.set_bind_group(
                 2,
-                &bind_groups.model_bind_group.as_ref().unwrap(),
+                bind_groups.model_bind_group.as_ref().unwrap(),
                 &[dynamic_index.index()],
             );
             render_pass.draw(0..4, 0..point_cloud_asset.num_points);

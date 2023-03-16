@@ -68,7 +68,6 @@ impl RenderAsset for PointCloudAsset {
     type Param = (SRes<RenderDevice>, SRes<PointCloudPipeline>);
 
     fn extract_asset(&self) -> Self::ExtractedAsset {
-        println!("Extracted asset");
         self.clone()
     }
 
@@ -79,7 +78,6 @@ impl RenderAsset for PointCloudAsset {
         Self::PreparedAsset,
         bevy::render::render_asset::PrepareAssetError<Self::ExtractedAsset>,
     > {
-        println!("Prepared asset");
         let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
             usage: BufferUsages::STORAGE,
             label: Some("Point cloud vertex buffer"),

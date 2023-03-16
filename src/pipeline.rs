@@ -6,19 +6,7 @@ use bevy::{
         extract_component::ComponentUniforms,
         extract_resource::ExtractResource,
         render_asset::RenderAssets,
-        render_resource::{
-            BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendComponent,
-            BlendFactor, BlendOperation, BlendState, Buffer, BufferBindingType,
-            BufferInitDescriptor, BufferUsages, CachedRenderPipelineId, ColorTargetState,
-            ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Extent3d,
-            FragmentState, FrontFace, MultisampleState, PipelineCache, PolygonMode, PrimitiveState,
-            PrimitiveTopology, RenderPipelineDescriptor, Sampler, SamplerBindingType,
-            SamplerDescriptor, ShaderStages, StencilFaceState, StencilState, Texture,
-            TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages,
-            TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat,
-            VertexState, VertexStepMode,
-        },
+        render_resource::*,
         renderer::{RenderDevice, RenderQueue},
         texture::{BevyDefault, TextureCache},
         view::{ExtractedView, ViewTarget, ViewUniforms},
@@ -90,7 +78,7 @@ pub(crate) fn prepare_point_cloud_bind_group(
     }
 }
 
-const QUAD_VERTEX_BUF: &'static [f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
+const QUAD_VERTEX_BUF: &[f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
 
 impl PointCloudPipeline {
     pub fn from_app(app: &mut App, colored: bool, animated: bool) -> Self {
@@ -472,12 +460,10 @@ pub fn prepare_animated_assets(
                         asset.animation_time = 0.0;
                     }
 
-                    let scale: [f32; 3] = asset.animation_scale.into();
-                    let mut iter = frames[asset.current_animation_frame]
-                        .data
-                        .iter()
-                        .enumerate();
-                    for (i, arr) in frames[asset.current_animation_frame].frame_as_vec3a().enumerate() {
+                    for (i, arr) in frames[asset.current_animation_frame]
+                        .frame_as_vec3a()
+                        .enumerate()
+                    {
                         let arr = arr * asset.animation_scale;
                         let arr: [f32; 3] = arr.into();
                         for j in 0..3 {
