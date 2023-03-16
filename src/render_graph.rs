@@ -99,7 +99,7 @@ impl Node for PointCloudNode {
         let eye_dome_pipeline =
             pipeline_cache.get_render_pipeline(point_cloud_pipeline.eye_dome_pipeline_id);
         if pipeline.is_none() || eye_dome_pipeline.is_none() {
-            println!("No pipeline");
+            warn!("No pipeline");
             return Ok(());
         }
         let pipeline = pipeline.unwrap();
@@ -108,7 +108,7 @@ impl Node for PointCloudNode {
         render_pass.set_pipeline(pipeline);
         let bind_groups = world.resource::<PointCloudBindGroup>();
         if bind_groups.bind_group.is_none() || bind_groups.model_bind_group.is_none() {
-            println!("No bind group");
+            warn!("No bind group");
             return Ok(());
         }
         render_pass.set_bind_group(
