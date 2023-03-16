@@ -1,8 +1,19 @@
+use crate::pipeline::{EyeDomeViewTarget, PointCloudBindGroup, PointCloudPipeline};
+use crate::{PointCloudAsset, PointCloudUniform};
 use bevy::core_pipeline::core_3d::MainPass3dNode;
 use bevy::prelude::*;
 use bevy::render::extract_component::DynamicUniformIndex;
+use bevy::render::render_asset::RenderAssets;
+use bevy::render::render_graph::{Node, SlotInfo, SlotType};
+use bevy::render::render_resource::{
+    LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment, RenderPassDescriptor,
+};
+use bevy::render::view::{
+    ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset, VisibleEntities,
+};
 
 pub struct PointCloudNode {
+    #[allow(clippy::type_complexity)]
     query: QueryState<
         (
             &'static ExtractedView,
@@ -33,17 +44,6 @@ impl PointCloudNode {
     }
 }
 
-use bevy::render::render_asset::RenderAssets;
-use bevy::render::render_graph::{Node, SlotInfo, SlotType};
-use bevy::render::render_resource::{
-    LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment, RenderPassDescriptor,
-};
-use bevy::render::view::{
-    ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset, VisibleEntities,
-};
-
-use crate::pipeline::{EyeDomeViewTarget, PointCloudBindGroup, PointCloudPipeline};
-use crate::{PointCloudAsset, PointCloudUniform};
 impl Node for PointCloudNode {
     fn input(&self) -> Vec<SlotInfo> {
         vec![SlotInfo::new(MainPass3dNode::IN_VIEW, SlotType::Entity)]
