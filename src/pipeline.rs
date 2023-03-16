@@ -78,7 +78,7 @@ pub(crate) fn prepare_point_cloud_bind_group(
     }
 }
 
-const QUAD_VERTEX_BUF: &'static [f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
+const QUAD_VERTEX_BUF: &[f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
 
 impl PointCloudPipeline {
     pub fn from_app(app: &mut App, colored: bool, animated: bool) -> Self {
@@ -460,11 +460,6 @@ pub fn prepare_animated_assets(
                         asset.animation_time = 0.0;
                     }
 
-                    let scale: [f32; 3] = asset.animation_scale.into();
-                    let mut iter = frames[asset.current_animation_frame]
-                        .data
-                        .iter()
-                        .enumerate();
                     for (i, arr) in frames[asset.current_animation_frame]
                         .frame_as_vec3a()
                         .enumerate()

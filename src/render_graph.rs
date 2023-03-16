@@ -113,11 +113,11 @@ impl Node for PointCloudNode {
         }
         render_pass.set_bind_group(
             0,
-            &bind_groups.bind_group.as_ref().unwrap(),
+            bind_groups.bind_group.as_ref().unwrap(),
             &[view_uniform_offset.offset],
         );
         render_pass.set_vertex_buffer(0, *point_cloud_pipeline.instanced_point_quad.slice(0..32));
-        for (entity, point_cloud_asset, dynamic_index) in self.entity_query.iter_manual(&world) {
+        for (entity, point_cloud_asset, dynamic_index) in self.entity_query.iter_manual(world) {
             if !visible_entities.entities.contains(&entity) {
                 continue;
             }
@@ -130,7 +130,7 @@ impl Node for PointCloudNode {
 
             render_pass.set_bind_group(
                 2,
-                &bind_groups.model_bind_group.as_ref().unwrap(),
+                bind_groups.model_bind_group.as_ref().unwrap(),
                 &[dynamic_index.index()],
             );
             render_pass.draw(0..4, 0..point_cloud_asset.num_points);

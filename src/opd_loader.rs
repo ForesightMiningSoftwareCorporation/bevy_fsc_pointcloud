@@ -7,7 +7,7 @@ use bevy::{asset::AssetLoader, prelude::Mesh};
 pub struct OpdLoader;
 
 impl OpdLoader {
-    pub async fn load_opd<'a>(bytes: &'a [u8]) -> Result<PointCloudAsset, anyhow::Error> {
+    pub async fn load_opd(bytes: &[u8]) -> Result<PointCloudAsset, anyhow::Error> {
         let file = opd_parser::parse(bytes).map_err(|e| e.to_owned())?.1;
         let mut positions: Vec<Vec3A> = Vec::new();
 
