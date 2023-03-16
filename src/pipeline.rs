@@ -477,7 +477,10 @@ pub fn prepare_animated_assets(
                         .data
                         .iter()
                         .enumerate();
-                    for (i, arr) in frames[asset.current_animation_frame].frame_as_vec3a().enumerate() {
+                    for (i, arr) in frames[asset.current_animation_frame]
+                        .frame_as_vec3a()
+                        .enumerate()
+                    {
                         let arr = arr * asset.animation_scale;
                         let arr: [f32; 3] = arr.into();
                         for j in 0..3 {
