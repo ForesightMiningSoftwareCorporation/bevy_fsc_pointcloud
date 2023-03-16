@@ -191,17 +191,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy-potree"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bevy",
- "las",
- "opd-parser",
- "smooth-bevy-cameras",
-]
-
-[[package]]
 name = "bevy_animation"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -378,6 +367,17 @@ checksum = "962b6bb0d30e92ec2e6c29837acce9e55b920733a634e7c3c5fd5a514bea7a24"
 dependencies = [
  "bevy_macro_utils",
  "encase_derive_impl",
+]
+
+[[package]]
+name = "bevy_fsc_point_cloud"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "las",
+ "opd-parser",
+ "smooth-bevy-cameras",
 ]
 
 [[package]]
