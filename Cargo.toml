@@ -17,7 +17,7 @@ opd = ["opd-parser"]
 
 [dependencies]
 bevy = "0.9"
-opd-parser = { version = "0.1.0", registry = "foresight-mining-software-corporation", optional = true }
+opd-parser = { version = "0.1.0", optional = true }
 anyhow = "1"
 las = { version = "0.8", features = ["laz"], optional = true }
 
