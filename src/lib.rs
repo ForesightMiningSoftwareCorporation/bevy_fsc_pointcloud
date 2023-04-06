@@ -66,7 +66,7 @@ impl Plugin for PointCloudPlugin {
 
         render_app
             .add_system_to_stage(RenderStage::Extract, extract_point_cloud)
-            .add_system_to_stage(RenderStage::Prepare, prepare_point_cloud_bind_group)
+            .add_system_to_stage(RenderStage::Queue, prepare_point_cloud_bind_group)
             .add_system_to_stage(RenderStage::Queue, prepare_view_targets)
             .init_resource::<PointCloudBindGroup>()
             .insert_resource(point_cloud_pipeline);
