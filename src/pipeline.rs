@@ -15,7 +15,10 @@ use bevy::{
     utils::HashMap,
 };
 
-use crate::{PointCloudAsset, PointCloudUniform};
+use crate::{
+    clippling_planes::{UniformBufferOfGpuClippingPlaneRanges},
+    PointCloudAsset, PointCloudUniform,
+};
 
 pub(crate) const POINT_CLOUD_VERT_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf01);
@@ -50,19 +53,28 @@ pub(crate) fn prepare_point_cloud_bind_group(
     render_device: Res<RenderDevice>,
     pipeline: Res<PointCloudPipeline>,
     view_uniform: Res<ViewUniforms>,
+    clipping_planes_uniform: Res<UniformBufferOfGpuClippingPlaneRanges>,
     model_uniform: Res<ComponentUniforms<PointCloudUniform>>,
     mut bind_groups: ResMut<PointCloudBindGroup>,
 ) {
-    if let Some(resource) = view_uniform.uniforms.binding() {
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            label: Some("point_cloud_bind_group"),
-            layout: &pipeline.view_layout,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource,
-            }],
-        });
-        bind_groups.bind_group = Some(bind_group);
+    if let Some(view_uniform_resource) = view_uniform.uniforms.binding() {
+        if let Some(clipping_plane_resource) = clipping_planes_uniform.0.binding() {
+            let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+                label: Some("point_cloud_bind_group"),
+                layout: &pipeline.view_layout,
+                entries: &[
+                    BindGroupEntry {
+                        binding: 0,
+                        resource: view_uniform_resource,
+                    },
+                    BindGroupEntry {
+                        binding: 1,
+                        resource: clipping_plane_resource,
+                    },
+                ],
+            });
+            bind_groups.bind_group = Some(bind_group);
+        }
     }
 
     if let Some(binding) = model_uniform.uniforms().binding() {
@@ -106,16 +118,28 @@ impl PointCloudPipeline {
         });
         let view_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("PointCloudViewLabel"),
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
-                ty: BindingType::Buffer {
-                    ty: BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: None,
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: true,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
         });
         let entity_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("PointCloudViewLayout"),

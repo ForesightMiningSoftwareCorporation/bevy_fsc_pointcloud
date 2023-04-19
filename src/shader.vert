@@ -1,3 +1,4 @@
+#version 460
 layout(location = 0) in vec2 in_Position_Point;
 
 layout(location = 0) out vec2 out_Point_Location;
@@ -13,6 +14,16 @@ layout(set = 0, binding = 0) uniform View {
     vec3 world_position;
     vec4 viewport;
 };
+struct ClippingPlane {
+    vec3 origin;
+    vec3 unit_normal;
+    float min_sdist;
+    float max_sdist;
+};
+layout(set = 0, binding = 1) uniform ClippingPlanes {
+    ClippingPlane ranges[16];
+    uint num_ranges;
+} clipping_planes;
 
 layout(set = 2, binding = 0) uniform Model {
     mat4 model_transform;
@@ -46,6 +57,11 @@ layout(std430, set = 1, binding = 0) readonly buffer Asset {
     Point[] points;
 };
 
+void discard_vertex() {
+    float nan = uintBitsToFloat(0x7fc00000);
+    gl_Position = vec4(nan);
+}
+
 void main() {
     Point p = points[gl_InstanceIndex];
 
@@ -58,7 +74,21 @@ void main() {
     #endif
 
     vec4 out_Pos = view_proj * model_transform * vec4(in_Pos, 1.0);
+    if (clipping_planes.num_ranges > 0u) {
+        vec4 worldPos4 = model_transform * vec4(in_Pos, 1.0);
+        vec3 worldPos = worldPos4.xyz / worldPos4.w;
 
+        // Clip any points that falls out of the allowed ranges.
+        for (uint i = 0; i < clipping_planes.num_ranges; i++) {
+            ClippingPlane range = clipping_planes.ranges[i];
+            float sdist_to_plane = dot(worldPos - range.origin, range.unit_normal);
+            if (sdist_to_plane < range.min_sdist || sdist_to_plane > range.max_sdist) {
+                // DISCARD point
+                discard_vertex();
+                return;
+            }
+        }
+    }
     #ifdef COLORED
     out_Color = vec3(p.color_r, p.color_g, p.color_b);
     #else

@@ -1,5 +1,7 @@
 use bevy::prelude::*;
-use bevy_potree::{PointCloudAsset, PotreePointCloud};
+use bevy_fsc_point_cloud::{
+    ClippingPlaneBundle, ClippingPlaneRange, PointCloudAsset, PotreePointCloud,
+};
 use smooth_bevy_cameras::{
     controllers::fps::{FpsCameraBundle, FpsCameraPlugin},
     LookTransformPlugin,
@@ -11,7 +13,7 @@ fn main() {
         .add_plugin(LookTransformPlugin)
         .add_plugin(FpsCameraPlugin::default())
         .insert_resource(Msaa { samples: 1 })
-        .add_plugin(bevy_potree::PointCloudPlugin {
+        .add_plugin(bevy_fsc_point_cloud::PointCloudPlugin {
             colored: true,
             animated: false,
         })
@@ -39,4 +41,19 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
             Vec3::new(3.0, 3.0, 3.0),
             Vec3::ZERO,
         ));
+
+    commands.spawn(ClippingPlaneBundle {
+        range: ClippingPlaneRange {
+            min_sdist: 0.0,
+            max_sdist: 0.5,
+        },
+        transform: TransformBundle {
+            local: Transform::from_translation(Vec3 {
+                x: 0.0,
+                y: 30.0,
+                z: 0.0,
+            }),
+            global: Default::default(),
+        },
+    });
 }
