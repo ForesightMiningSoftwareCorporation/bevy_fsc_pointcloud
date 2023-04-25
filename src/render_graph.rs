@@ -126,7 +126,7 @@ impl Node for PointCloudNode {
                 continue;
             }
             let point_cloud_asset = point_cloud_asset.unwrap();
-            render_pass.set_bind_group(1, &point_cloud_asset.bind_group, &[]);
+            render_pass.set_bind_group(1, point_cloud_asset.bind_group.as_ref().unwrap(), &[]);
 
             render_pass.set_bind_group(
                 2,

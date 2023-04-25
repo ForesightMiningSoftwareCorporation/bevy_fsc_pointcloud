@@ -51,13 +51,43 @@ pub(crate) fn extract_point_cloud(
 pub struct PreparedPointCloudAsset {
     pub buffer: Buffer,
     pub num_points: u32,
-    pub bind_group: BindGroup,
+    pub bind_group: Option<BindGroup>,
 
-    pub animation_buffer: Option<Buffer>,
+    pub animation_buffer: Option<(Buffer, Buffer)>,
     pub frames: Option<Frames>,
     pub current_animation_frame: usize,
     pub animation_time: f32,
+    pub animation_frame_start_time: f32,
     pub animation_scale: Vec3,
+}
+
+impl PreparedPointCloudAsset {
+    pub fn update_bind_group(
+        &mut self,
+        render_device: &RenderDevice,
+        pipeline: &PointCloudPipeline,
+    ) {
+        let mut bind_group_entires = vec![BindGroupEntry {
+            binding: 0,
+            resource: self.buffer.as_entire_binding(),
+        }];
+        if let Some((animation_buffer, next)) = self.animation_buffer.as_ref() {
+            bind_group_entires.push(BindGroupEntry {
+                binding: 1,
+                resource: animation_buffer.as_entire_binding(),
+            });
+            bind_group_entires.push(BindGroupEntry {
+                binding: 2,
+                resource: next.as_entire_binding(),
+            });
+        }
+        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+            label: "point cloud buffer bind group".into(),
+            layout: &pipeline.entity_layout,
+            entries: &bind_group_entires,
+        });
+        self.bind_group = Some(bind_group);
+    }
 }
 
 impl RenderAsset for PointCloudAsset {
@@ -85,49 +115,42 @@ impl RenderAsset for PointCloudAsset {
         });
 
         let animation_buffer = if extracted_asset.animation.is_some() {
-            Some(
-                render_device.create_buffer(&BufferDescriptor {
-                    label: Some("AnimationBuffer"),
-                    size: extracted_asset
-                        .mesh
-                        .attribute(Mesh::ATTRIBUTE_POSITION)
-                        .unwrap()
-                        .len() as u64
-                        * std::mem::size_of::<f32>() as u64
-                        * 3,
-                    usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                }),
-            )
+            let size = extracted_asset
+                .mesh
+                .attribute(Mesh::ATTRIBUTE_POSITION)
+                .unwrap()
+                .len() as u64
+                * std::mem::size_of::<f32>() as u64
+                * 3
+                + std::mem::size_of::<f32>() as u64;
+            let animation_buffer = render_device.create_buffer(&BufferDescriptor {
+                label: Some("AnimationBuffer"),
+                size,
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            let animation_buffer_next = render_device.create_buffer(&BufferDescriptor {
+                label: Some("AnimationBufferNext"),
+                size,
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            Some((animation_buffer, animation_buffer_next))
         } else {
             None
         };
-
-        let mut bind_group_entires = vec![BindGroupEntry {
-            binding: 0,
-            resource: buffer.as_entire_binding(),
-        }];
-        if let Some(animation_buffer) = animation_buffer.as_ref() {
-            bind_group_entires.push(BindGroupEntry {
-                binding: 1,
-                resource: animation_buffer.as_entire_binding(),
-            });
-        }
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            label: "point cloud buffer bind group".into(),
-            layout: &pipeline.entity_layout,
-            entries: &bind_group_entires,
-        });
-
-        Ok(PreparedPointCloudAsset {
+        let mut asset = PreparedPointCloudAsset {
             buffer,
             num_points: extracted_asset.mesh.count_vertices() as u32,
-            bind_group,
+            bind_group: None,
             animation_buffer,
             frames: extracted_asset.animation,
             current_animation_frame: 0,
             animation_time: 0.0,
+            animation_frame_start_time: 0.0,
             animation_scale: extracted_asset.animation_scale,
-        })
+        };
+        asset.update_bind_group(render_device, pipeline);
+        Ok(asset)
     }
 }
