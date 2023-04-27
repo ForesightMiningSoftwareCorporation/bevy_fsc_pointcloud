@@ -492,7 +492,6 @@ pub fn prepare_animated_assets(
                     let delta = asset.animation_time - asset.animation_frame_start_time;
                     let interpolation = (delta / duration).min(1.0);
                     queue.write_buffer(&next_animation_buffer, 0, unsafe {
-                        println!("{:?}", interpolation);
                         std::slice::from_raw_parts(
                             &interpolation as *const f32 as *const u8,
                             std::mem::size_of::<f32>(),
