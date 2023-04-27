@@ -10,7 +10,7 @@ use bevy::{
     asset::load_internal_asset,
     prelude::*,
     render::{
-        extract_component::UniformComponentPlugin,
+        extract_component::{UniformComponentPlugin},
         extract_resource::ExtractResourcePlugin,
         render_asset::{PrepareAssetLabel, RenderAssetPlugin},
         render_graph::RenderGraph,
