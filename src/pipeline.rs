@@ -16,8 +16,7 @@ use bevy::{
 };
 
 use crate::{
-    clippling_planes::{UniformBufferOfGpuClippingPlaneRanges},
-    PointCloudAsset, PointCloudUniform,
+    clippling_planes::UniformBufferOfGpuClippingPlaneRanges, PointCloudAsset, PointCloudUniform,
 };
 
 pub(crate) const POINT_CLOUD_VERT_SHADER_HANDLE: HandleUntyped =
@@ -57,24 +56,25 @@ pub(crate) fn prepare_point_cloud_bind_group(
     model_uniform: Res<ComponentUniforms<PointCloudUniform>>,
     mut bind_groups: ResMut<PointCloudBindGroup>,
 ) {
-    if let Some(view_uniform_resource) = view_uniform.uniforms.binding() {
-        if let Some(clipping_plane_resource) = clipping_planes_uniform.0.binding() {
-            let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-                label: Some("point_cloud_bind_group"),
-                layout: &pipeline.view_layout,
-                entries: &[
-                    BindGroupEntry {
-                        binding: 0,
-                        resource: view_uniform_resource,
-                    },
-                    BindGroupEntry {
-                        binding: 1,
-                        resource: clipping_plane_resource,
-                    },
-                ],
-            });
-            bind_groups.bind_group = Some(bind_group);
-        }
+    if let (Some(view_uniform_resource), Some(clipping_plane_resource)) = (
+        view_uniform.uniforms.binding(),
+        clipping_planes_uniform.0.binding(),
+    ) {
+        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+            label: Some("point_cloud_bind_group"),
+            layout: &pipeline.view_layout,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: view_uniform_resource,
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: clipping_plane_resource,
+                },
+            ],
+        });
+        bind_groups.bind_group = Some(bind_group);
     }
 
     if let Some(binding) = model_uniform.uniforms().binding() {
