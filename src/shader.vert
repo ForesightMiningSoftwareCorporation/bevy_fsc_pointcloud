@@ -38,7 +38,13 @@ struct PointOffset {
 
 #ifdef ANIMATED
 layout(std430, set = 1, binding = 1) readonly buffer AnimationOffset {
-    PointOffset[] offsets;
+    float _old_interpolation;
+    PointOffset[] prev_offsets;
+};
+
+layout(std430, set = 1, binding = 2) readonly buffer AnimationOffset {
+    float interpolation;
+    PointOffset[] next_offsets;
 };
 #endif
 
@@ -67,10 +73,12 @@ void main() {
 
     vec3 in_Pos = vec3(p.position_x, p.position_y, p.position_z);
     #ifdef ANIMATED
-    PointOffset offset = offsets[gl_InstanceIndex];
-    in_Pos.x += offset.position_x;
-    in_Pos.y += offset.position_y;
-    in_Pos.z += offset.position_z;
+    PointOffset prev_offset = prev_offsets[gl_InstanceIndex];
+    PointOffset next_offset = next_offsets[gl_InstanceIndex];
+    vec3 prev = vec3(prev_offset.position_x, prev_offset.position_y, prev_offset.position_z);
+    vec3 next = vec3(next_offset.position_x, next_offset.position_y, next_offset.position_z);
+    vec3 interpolated = prev + (next - prev) * interpolation;
+    in_Pos += interpolated;
     #endif
 
     vec4 out_Pos = view_proj * model_transform * vec4(in_Pos, 1.0);
