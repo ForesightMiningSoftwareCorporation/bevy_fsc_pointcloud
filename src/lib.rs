@@ -1,3 +1,4 @@
+mod clippling_planes;
 #[cfg(feature = "las")]
 mod las_loader;
 #[cfg(feature = "opd")]
@@ -17,6 +18,7 @@ use bevy::{
         RenderApp, RenderStage,
     },
 };
+pub use clippling_planes::{ClippingPlaneBundle, ClippingPlaneRange};
 #[cfg(feature = "las")]
 pub use las_loader::*;
 #[cfg(feature = "opd")]
@@ -68,6 +70,15 @@ impl Plugin for PointCloudPlugin {
             .add_system_to_stage(RenderStage::Extract, extract_point_cloud)
             .add_system_to_stage(RenderStage::Queue, prepare_point_cloud_bind_group)
             .add_system_to_stage(RenderStage::Queue, prepare_view_targets)
+            .add_system_to_stage(
+                RenderStage::Extract,
+                clippling_planes::extract_clipping_planes,
+            )
+            .add_system_to_stage(
+                RenderStage::Prepare,
+                clippling_planes::prepare_clipping_planes,
+            )
+            .init_resource::<clippling_planes::UniformBufferOfGpuClippingPlaneRanges>()
             .init_resource::<PointCloudBindGroup>()
             .insert_resource(point_cloud_pipeline);
         if self.animated {

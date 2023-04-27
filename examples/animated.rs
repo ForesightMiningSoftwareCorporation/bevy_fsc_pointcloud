@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_potree::{PointCloudAsset, PotreePointCloud};
+use bevy_fsc_point_cloud::{PointCloudAsset, PotreePointCloud};
 use smooth_bevy_cameras::{
     controllers::fps::{FpsCameraBundle, FpsCameraPlugin},
     LookTransformPlugin,
@@ -11,7 +11,7 @@ fn main() {
         .add_plugin(LookTransformPlugin)
         .add_plugin(FpsCameraPlugin::default())
         .insert_resource(Msaa { samples: 1 })
-        .add_plugin(bevy_potree::PointCloudPlugin {
+        .add_plugin(bevy_fsc_point_cloud::PointCloudPlugin {
             colored: false,
             animated: true,
         })
