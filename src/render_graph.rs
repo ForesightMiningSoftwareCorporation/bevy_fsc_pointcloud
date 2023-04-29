@@ -2,9 +2,11 @@ use crate::pipeline::{EyeDomeViewTarget, PointCloudBindGroup, PointCloudPipeline
 use crate::{PointCloudAsset, PointCloudUniform};
 use bevy::core_pipeline::core_3d::MainPass3dNode;
 use bevy::prelude::*;
+use bevy::render::camera::ExtractedCamera;
 use bevy::render::extract_component::DynamicUniformIndex;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_graph::{Node, SlotInfo, SlotType};
+use bevy::render::render_phase::TrackedRenderPass;
 use bevy::render::render_resource::{
     LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment, RenderPassDescriptor,
 };
@@ -17,6 +19,7 @@ pub struct PointCloudNode {
     query: QueryState<
         (
             &'static ExtractedView,
+            &'static ExtractedCamera,
             &'static ViewTarget,
             &'static ViewDepthTexture,
             &'static ViewUniformOffset,
@@ -64,37 +67,46 @@ impl Node for PointCloudNode {
         let point_cloud_pipeline = world.resource::<PointCloudPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
         let render_assets = world.resource::<RenderAssets<PointCloudAsset>>();
-        let (_view, target, _depth, view_uniform_offset, eye_dome_view_target, visible_entities) =
-            match self.query.get_manual(world, view_entity) {
-                Ok(query) => query,
-                Err(_) => {
-                    return Ok(());
-                } // No window
-            };
+        let (
+            _view,
+            camera,
+            target,
+            _depth,
+            view_uniform_offset,
+            eye_dome_view_target,
+            visible_entities,
+        ) = match self.query.get_manual(world, view_entity) {
+            Ok(query) => query,
+            Err(_) => {
+                return Ok(());
+            } // No window
+        };
 
-        let mut render_pass =
-            render_context
-                .command_encoder
-                .begin_render_pass(&RenderPassDescriptor {
-                    label: Some("point_cloud"),
-                    // NOTE: The opaque pass loads the color
-                    // buffer as well as writing to it.
-                    color_attachments: &[Some(target.get_color_attachment(Operations {
-                        load: LoadOp::Load,
+        let render_pass = render_context
+            .command_encoder
+            .begin_render_pass(&RenderPassDescriptor {
+                label: Some("point_cloud"),
+                // NOTE: The opaque pass loads the color
+                // buffer as well as writing to it.
+                color_attachments: &[Some(target.get_color_attachment(Operations {
+                    load: LoadOp::Load,
+                    store: true,
+                }))],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: &eye_dome_view_target.depth_texture_view,
+                    // NOTE: The opaque main pass loads the depth buffer and possibly overwrites it
+                    depth_ops: Some(Operations {
+                        // NOTE: 0.0 is the far plane due to bevy's use of reverse-z projections.
+                        load: LoadOp::Clear(0.0),
                         store: true,
-                    }))],
-                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                        view: &eye_dome_view_target.depth_texture_view,
-                        // NOTE: The opaque main pass loads the depth buffer and possibly overwrites it
-                        depth_ops: Some(Operations {
-                            // NOTE: 0.0 is the far plane due to bevy's use of reverse-z projections.
-                            load: LoadOp::Clear(0.0),
-                            store: true,
-                        }),
-                        stencil_ops: None,
                     }),
-                });
-
+                    stencil_ops: None,
+                }),
+            });
+        let mut tracked_pass = TrackedRenderPass::new(render_pass);
+        if let Some(viewport) = camera.viewport.as_ref() {
+            tracked_pass.set_camera_viewport(viewport);
+        }
         let pipeline = pipeline_cache.get_render_pipeline(point_cloud_pipeline.pipeline_id);
         let eye_dome_pipeline =
             pipeline_cache.get_render_pipeline(point_cloud_pipeline.eye_dome_pipeline_id);
@@ -105,18 +117,18 @@ impl Node for PointCloudNode {
         let pipeline = pipeline.unwrap();
         let eye_dome_pipeline = eye_dome_pipeline.unwrap();
 
-        render_pass.set_pipeline(pipeline);
+        tracked_pass.set_render_pipeline(pipeline);
         let bind_groups = world.resource::<PointCloudBindGroup>();
         if bind_groups.bind_group.is_none() || bind_groups.model_bind_group.is_none() {
             warn!("No bind group");
             return Ok(());
         }
-        render_pass.set_bind_group(
+        tracked_pass.set_bind_group(
             0,
             bind_groups.bind_group.as_ref().unwrap(),
             &[view_uniform_offset.offset],
         );
-        render_pass.set_vertex_buffer(0, *point_cloud_pipeline.instanced_point_quad.slice(0..32));
+        tracked_pass.set_vertex_buffer(0, point_cloud_pipeline.instanced_point_quad.slice(0..32));
         for (entity, point_cloud_asset, dynamic_index) in self.entity_query.iter_manual(world) {
             if !visible_entities.entities.contains(&entity) {
                 continue;
@@ -126,34 +138,36 @@ impl Node for PointCloudNode {
                 continue;
             }
             let point_cloud_asset = point_cloud_asset.unwrap();
-            render_pass.set_bind_group(1, point_cloud_asset.bind_group.as_ref().unwrap(), &[]);
-
-            render_pass.set_bind_group(
+            tracked_pass.set_bind_group(1, point_cloud_asset.bind_group.as_ref().unwrap(), &[]);
+            tracked_pass.set_bind_group(
                 2,
                 bind_groups.model_bind_group.as_ref().unwrap(),
                 &[dynamic_index.index()],
             );
-            render_pass.draw(0..4, 0..point_cloud_asset.num_points);
+            tracked_pass.draw(0..4, 0..point_cloud_asset.num_points);
         }
 
-        drop(render_pass);
-        let mut render_pass =
-            render_context
-                .command_encoder
-                .begin_render_pass(&RenderPassDescriptor {
-                    label: Some("eye_dome_lighting"),
-                    // NOTE: The opaque pass loads the color
-                    // buffer as well as writing to it.
-                    color_attachments: &[Some(target.get_color_attachment(Operations {
-                        load: LoadOp::Load,
-                        store: true,
-                    }))],
-                    depth_stencil_attachment: None,
-                });
-        render_pass.set_pipeline(eye_dome_pipeline);
-        render_pass.set_bind_group(0, &eye_dome_view_target.bind_group, &[]);
-        render_pass.set_vertex_buffer(0, *point_cloud_pipeline.instanced_point_quad.slice(0..32));
-        render_pass.draw(0..4, 0..1);
+        drop(tracked_pass);
+        let render_pass = render_context
+            .command_encoder
+            .begin_render_pass(&RenderPassDescriptor {
+                label: Some("eye_dome_lighting"),
+                // NOTE: The opaque pass loads the color
+                // buffer as well as writing to it.
+                color_attachments: &[Some(target.get_color_attachment(Operations {
+                    load: LoadOp::Load,
+                    store: true,
+                }))],
+                depth_stencil_attachment: None,
+            });
+        let mut tracked_pass = TrackedRenderPass::new(render_pass);
+        if let Some(viewport) = camera.viewport.as_ref() {
+            tracked_pass.set_camera_viewport(viewport);
+        }
+        tracked_pass.set_render_pipeline(eye_dome_pipeline);
+        tracked_pass.set_bind_group(0, &eye_dome_view_target.bind_group, &[]);
+        tracked_pass.set_vertex_buffer(0, point_cloud_pipeline.instanced_point_quad.slice(0..32));
+        tracked_pass.draw(0..4, 0..1);
         Ok(())
     }
 
