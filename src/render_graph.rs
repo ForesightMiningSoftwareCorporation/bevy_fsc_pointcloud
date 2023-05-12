@@ -120,7 +120,6 @@ impl Node for PointCloudNode {
         tracked_pass.set_render_pipeline(pipeline);
         let bind_groups = world.resource::<PointCloudBindGroup>();
         if bind_groups.bind_group.is_none() || bind_groups.model_bind_group.is_none() {
-            warn!("No bind group");
             return Ok(());
         }
         tracked_pass.set_bind_group(
