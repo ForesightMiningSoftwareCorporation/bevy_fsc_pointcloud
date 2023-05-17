@@ -6,7 +6,6 @@ use bevy::render::camera::ExtractedCamera;
 use bevy::render::extract_component::DynamicUniformIndex;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_graph::{Node, SlotInfo, SlotType};
-use bevy::render::render_phase::TrackedRenderPass;
 use bevy::render::render_resource::{
     LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment, RenderPassDescriptor,
 };
@@ -82,9 +81,8 @@ impl Node for PointCloudNode {
             } // No window
         };
 
-        let render_pass = render_context
-            .command_encoder
-            .begin_render_pass(&RenderPassDescriptor {
+        let mut tracked_pass = render_context
+            .begin_tracked_render_pass(RenderPassDescriptor {
                 label: Some("point_cloud"),
                 // NOTE: The opaque pass loads the color
                 // buffer as well as writing to it.
@@ -103,7 +101,6 @@ impl Node for PointCloudNode {
                     stencil_ops: None,
                 }),
             });
-        let mut tracked_pass = TrackedRenderPass::new(render_pass);
         if let Some(viewport) = camera.viewport.as_ref() {
             tracked_pass.set_camera_viewport(viewport);
         }
@@ -145,11 +142,10 @@ impl Node for PointCloudNode {
             );
             tracked_pass.draw(0..4, 0..point_cloud_asset.num_points);
         }
-
         drop(tracked_pass);
-        let render_pass = render_context
-            .command_encoder
-            .begin_render_pass(&RenderPassDescriptor {
+
+        let mut tracked_pass = render_context
+            .begin_tracked_render_pass(RenderPassDescriptor {
                 label: Some("eye_dome_lighting"),
                 // NOTE: The opaque pass loads the color
                 // buffer as well as writing to it.
@@ -159,7 +155,6 @@ impl Node for PointCloudNode {
                 }))],
                 depth_stencil_attachment: None,
             });
-        let mut tracked_pass = TrackedRenderPass::new(render_pass);
         if let Some(viewport) = camera.viewport.as_ref() {
             tracked_pass.set_camera_viewport(viewport);
         }
