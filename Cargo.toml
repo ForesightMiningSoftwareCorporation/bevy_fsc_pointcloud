@@ -16,10 +16,10 @@ default = ["opd", "las"]
 opd = ["opd-parser"]
 
 [dependencies]
-bevy = "0.9"
-opd-parser = { version = "0.1.0", optional = true }
+bevy = "0.10"
+opd-parser = { version = "0.3.0", optional = true }
 anyhow = "1"
 las = { version = "0.8", features = ["laz"], optional = true }
 
 [dev-dependencies]
-smooth-bevy-cameras = { git = "https://github.com/olegomon/smooth-bevy-cameras" }
+smooth-bevy-cameras = "0.8"

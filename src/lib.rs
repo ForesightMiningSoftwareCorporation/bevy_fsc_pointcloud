@@ -12,10 +12,10 @@ use bevy::{
     render::{
         extract_component::UniformComponentPlugin,
         extract_resource::ExtractResourcePlugin,
-        render_asset::{PrepareAssetLabel, RenderAssetPlugin},
+        render_asset::{PrepareAssetSet, RenderAssetPlugin},
         render_graph::RenderGraph,
         render_resource::ShaderStage,
-        RenderApp, RenderStage,
+        RenderApp, RenderSet,
     },
 };
 pub use clippling_planes::{ClippingPlaneBundle, ClippingPlaneRange};
@@ -43,8 +43,8 @@ impl Plugin for PointCloudPlugin {
         #[cfg(feature = "opd")]
         app.add_asset_loader(OpdLoader);
         app.add_plugin(
-            RenderAssetPlugin::<PointCloudAsset>::with_prepare_asset_label(
-                PrepareAssetLabel::AssetPrepare,
+            RenderAssetPlugin::<PointCloudAsset>::with_prepare_asset_set(
+                PrepareAssetSet::AssetPrepare,
             ),
         )
         .add_plugin(UniformComponentPlugin::<PointCloudUniform>::default());
@@ -67,23 +67,15 @@ impl Plugin for PointCloudPlugin {
         let render_app = app.sub_app_mut(RenderApp);
 
         render_app
-            .add_system_to_stage(RenderStage::Extract, extract_point_cloud)
-            .add_system_to_stage(RenderStage::Queue, prepare_point_cloud_bind_group)
-            .add_system_to_stage(RenderStage::Queue, prepare_view_targets)
-            .add_system_to_stage(
-                RenderStage::Extract,
-                clippling_planes::extract_clipping_planes,
-            )
-            .add_system_to_stage(
-                RenderStage::Prepare,
-                clippling_planes::prepare_clipping_planes,
-            )
+            .add_systems((extract_point_cloud, clippling_planes::extract_clipping_planes).in_schedule(ExtractSchedule))
+            .add_systems((prepare_point_cloud_bind_group, prepare_view_targets).in_set(RenderSet::Queue))
+            .add_systems((clippling_planes::prepare_clipping_planes,).in_set(RenderSet::Prepare))
             .init_resource::<clippling_planes::UniformBufferOfGpuClippingPlaneRanges>()
             .init_resource::<PointCloudBindGroup>()
             .insert_resource(point_cloud_pipeline);
         if self.animated {
             render_app
-                .add_system_to_stage(RenderStage::Prepare, prepare_animated_assets)
+                .add_systems((prepare_animated_assets,).in_set(RenderSet::Prepare))
                 .init_resource::<PointCloudPlaybackControl>();
         }
         let point_cloud_node = PointCloudNode::new(&mut render_app.world);
@@ -98,15 +90,13 @@ impl Plugin for PointCloudPlugin {
             .add_node_edge(
                 bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
                 PointCloudNode::NAME,
-            )
-            .unwrap();
+            );
         draw_3d_graph
             .add_slot_edge(
-                draw_3d_graph.input_node().unwrap().id,
+                draw_3d_graph.input_node().id,
                 bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
                 PointCloudNode::NAME,
                 PointCloudNode::IN_VIEW,
-            )
-            .unwrap();
+            );
     }
 }

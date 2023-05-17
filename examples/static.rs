@@ -12,7 +12,6 @@ fn main() {
     app.add_plugins(DefaultPlugins.set(WindowPlugin::default()))
         .add_plugin(LookTransformPlugin)
         .add_plugin(FpsCameraPlugin::default())
-        .insert_resource(Msaa { samples: 1 })
         .add_plugin(bevy_fsc_point_cloud::PointCloudPlugin {
             colored: true,
             animated: false,
@@ -40,6 +39,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
             Default::default(),
             Vec3::new(3.0, 3.0, 3.0),
             Vec3::ZERO,
+            Vec3::Y
         ));
 
     commands.spawn(ClippingPlaneBundle {

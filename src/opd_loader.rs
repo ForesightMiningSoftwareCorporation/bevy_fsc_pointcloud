@@ -32,7 +32,7 @@ impl OpdLoader {
         Ok(PointCloudAsset {
             mesh,
             animation: Some(file.frames),
-            animation_scale: file.header.directive.scale,
+            animation_scale: file.header.directive.scale.into(),
         })
     }
 }

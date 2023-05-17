@@ -97,7 +97,7 @@ impl PointCloudPipeline {
         let msaa = app
             .world
             .get_resource::<Msaa>()
-            .map(|a| a.samples)
+            .map(|a| a.samples())
             .unwrap_or(1);
         let render_app = app.sub_app_mut(RenderApp);
         let world = &mut render_app.world;
@@ -214,20 +214,20 @@ impl PointCloudPipeline {
             });
         let pipeline_descriptor = RenderPipelineDescriptor {
             label: Some("point_cloud_pipeline".into()),
-            layout: Some(vec![
+            layout: vec![
                 view_layout.clone(),
                 entity_layout.clone(),
                 model_layout.clone(),
-            ]),
+            ],
             vertex: VertexState {
                 shader: POINT_CLOUD_VERT_SHADER_HANDLE.typed(),
                 shader_defs: {
                     let mut defs = Vec::new();
                     if colored {
-                        defs.push("COLORED".to_string());
+                        defs.push("COLORED".into());
                     }
                     if animated {
-                        defs.push("ANIMATED".to_string());
+                        defs.push("ANIMATED".into());
                     }
                     defs
                 },
@@ -247,10 +247,10 @@ impl PointCloudPipeline {
                 shader_defs: {
                     let mut defs = Vec::new();
                     if colored {
-                        defs.push("COLORED".to_string());
+                        defs.push("COLORED".into());
                     }
                     if animated {
-                        defs.push("ANIMATED".to_string());
+                        defs.push("ANIMATED".into());
                     }
                     defs
                 },
@@ -291,17 +291,18 @@ impl PointCloudPipeline {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
+            push_constant_ranges: default()
         };
 
         let eye_dome_pipeline_descriptor = RenderPipelineDescriptor {
             label: Some("EyeDomeLightingPipeline".into()),
-            layout: Some(vec![eye_dome_image_layout.clone()]),
+            layout: vec![eye_dome_image_layout.clone()],
             vertex: VertexState {
                 shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
                 shader_defs: if msaa > 1 {
-                    vec!["MULTISAMPLED".to_string()]
+                    vec!["MULTISAMPLED".into()]
                 } else {
-                    Vec::new()
+                    default()
                 },
                 entry_point: "vertex".into(),
                 buffers: vec![VertexBufferLayout {
@@ -332,9 +333,9 @@ impl PointCloudPipeline {
             fragment: Some(FragmentState {
                 shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
                 shader_defs: if msaa > 1 {
-                    vec!["MULTISAMPLED".to_string()]
+                    vec!["MULTISAMPLED".into()]
                 } else {
-                    Vec::new()
+                    default()
                 },
                 entry_point: "fragment".into(),
                 targets: vec![Some(ColorTargetState {
@@ -354,9 +355,10 @@ impl PointCloudPipeline {
                     write_mask: ColorWrites::COLOR,
                 })],
             }),
+            push_constant_ranges: default()
         };
 
-        let mut pipeline_cache = world.resource_mut::<PipelineCache>();
+        let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline_id = pipeline_cache.queue_render_pipeline(pipeline_descriptor);
         let eye_dome_pipeline_id =
             pipeline_cache.queue_render_pipeline(eye_dome_pipeline_descriptor);
@@ -391,7 +393,7 @@ pub(crate) fn prepare_view_targets(
     cameras: Query<(Entity, &ExtractedCamera, &ExtractedView, &ViewTarget)>,
     msaa: Option<Res<Msaa>>,
 ) {
-    let msaa = msaa.map(|a| a.samples).unwrap_or(1);
+    let msaa = msaa.map(|a| a.samples()).unwrap_or(1);
     let mut textures = HashMap::default();
 
     for (entity, camera, _view, _view_target) in cameras.iter() {
@@ -411,6 +413,7 @@ pub(crate) fn prepare_view_targets(
                     dimension: TextureDimension::D2,
                     format: TextureFormat::Depth32Float,
                     usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+                    view_formats: &[]
                 };
                 let cached_depth_texture = texture_cache.get(&render_device, depth_descriptor);
 
@@ -508,11 +511,10 @@ pub fn prepare_animated_assets(
                     }
 
                     for (i, arr) in frames[asset.current_animation_frame]
-                        .frame_as_vec3a()
+                        .into_iter()
                         .enumerate()
                     {
-                        let arr = arr * asset.animation_scale;
-                        let arr: [f32; 3] = arr.into();
+                        let arr = Vec3::from(arr) * asset.animation_scale;
                         for j in 0..3 {
                             view[i * 3 + j] = arr[j];
                         }
