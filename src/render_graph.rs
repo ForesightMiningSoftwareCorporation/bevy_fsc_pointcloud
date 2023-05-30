@@ -7,7 +7,7 @@ use bevy::render::extract_component::DynamicUniformIndex;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_graph::{Node, SlotInfo, SlotType};
 use bevy::render::render_resource::{
-    LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment, RenderPassDescriptor,
+    LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment, RenderPassDescriptor, ShaderStages,
 };
 use bevy::render::view::{
     ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset, VisibleEntities,
@@ -67,7 +67,7 @@ impl Node for PointCloudNode {
         let pipeline_cache = world.resource::<PipelineCache>();
         let render_assets = world.resource::<RenderAssets<PointCloudAsset>>();
         let (
-            _view,
+            view,
             camera,
             target,
             _depth,
@@ -159,6 +159,19 @@ impl Node for PointCloudNode {
             tracked_pass.set_camera_viewport(viewport);
         }
         tracked_pass.set_render_pipeline(eye_dome_pipeline);
+
+        let edl_strength: f32 = if view.projection.z_axis.w == -1.0 {
+            // perspective projection
+            1.0
+        } else {
+            // orthographic projection
+            let dist = 1.0 / view.projection.z_axis.z; // far - near
+            dist
+        };
+
+        tracked_pass.set_push_constants(ShaderStages::FRAGMENT, 0, unsafe {
+            std::slice::from_raw_parts(&edl_strength as *const f32 as *const u8, 4)
+        });
         tracked_pass.set_bind_group(0, &eye_dome_view_target.bind_group, &[]);
         tracked_pass.set_vertex_buffer(0, point_cloud_pipeline.instanced_point_quad.slice(0..32));
         tracked_pass.draw(0..4, 0..1);

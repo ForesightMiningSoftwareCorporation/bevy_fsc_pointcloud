@@ -6,6 +6,8 @@ var input_texture: texture_depth_multisampled_2d;
 var input_texture: texture_depth_2d;
 #endif
 
+var<push_constant> edl_strength: f32;
+
 
 @group(0) @binding(1) var s: sampler;
 
@@ -31,6 +33,6 @@ fn fragment(
     response += max(0.0, log_depth - log2(textureLoad(input_texture, vec2<i32>(ilocation.x, ilocation.y - 1), 0)));
     response /= 4.0;
 
-    var shade = exp(-response * 300.0 * 1.0);
+    var shade = exp(-response * 300.0 * edl_strength);
     return vec4<f32>(0.0, 0.0, 0.0, shade);
 }
