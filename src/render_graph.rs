@@ -162,11 +162,12 @@ impl Node for PointCloudNode {
 
         let edl_strength: f32 = if view.projection.z_axis.w == -1.0 {
             // perspective projection
+            // See https://github.com/bitshifter/glam-rs/blob/a35030d130c0464cbb07d6404df6843240182803/src/f32/scalar/mat4.rs#L843
             1.0
         } else {
             // orthographic projection
-            let dist = 1.0 / view.projection.z_axis.z; // far - near
-            dist
+            // See https://github.com/bitshifter/glam-rs/blob/a35030d130c0464cbb07d6404df6843240182803/src/f32/scalar/mat4.rs#L924
+            1.0 / view.projection.z_axis.z // near - far
         };
 
         tracked_pass.set_push_constants(ShaderStages::FRAGMENT, 0, unsafe {

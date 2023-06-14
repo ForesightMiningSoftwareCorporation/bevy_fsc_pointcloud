@@ -30,6 +30,8 @@ void main()
     
     if (projection[2][3] != -1.0) {
         // orthographic projection
+        // projection[2][2] is r = 1.0 / (near - far).
+        // This divides the depth offset by (near - far)
         depth_offset *= projection[2][2];
     }
 

@@ -358,7 +358,7 @@ impl PointCloudPipeline {
             push_constant_ranges: vec![
                 PushConstantRange {
                     stages: ShaderStages::FRAGMENT,
-                    range: 0..4
+                    range: 0..std::mem::size_of::<f32>() as u32
                 }
             ]
         };
