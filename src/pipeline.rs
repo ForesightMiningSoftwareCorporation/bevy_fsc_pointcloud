@@ -355,7 +355,12 @@ impl PointCloudPipeline {
                     write_mask: ColorWrites::COLOR,
                 })],
             }),
-            push_constant_ranges: default()
+            push_constant_ranges: vec![
+                PushConstantRange {
+                    stages: ShaderStages::FRAGMENT,
+                    range: 0..std::mem::size_of::<f32>() as u32
+                }
+            ]
         };
 
         let pipeline_cache = world.resource::<PipelineCache>();

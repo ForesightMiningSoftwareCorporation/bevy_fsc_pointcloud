@@ -27,6 +27,15 @@ void main()
 
 
     float depth = 1.0 / gl_FragCoord.w; // the world space depth
+    
+    if (projection[2][3] != -1.0) {
+        // orthographic projection
+        // projection[2][2] is r = 1.0 / (near - far).
+        // This divides the depth offset by (near - far)
+        depth_offset *= projection[2][2];
+    }
+
+
     float offseted_depth = depth + point_size * depth_offset;
 
     float z_near = gl_FragCoord.z * depth;
