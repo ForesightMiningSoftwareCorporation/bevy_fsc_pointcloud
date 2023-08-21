@@ -67,8 +67,16 @@ impl Plugin for PointCloudPlugin {
         let render_app = app.sub_app_mut(RenderApp);
 
         render_app
-            .add_systems((extract_point_cloud, clippling_planes::extract_clipping_planes).in_schedule(ExtractSchedule))
-            .add_systems((prepare_point_cloud_bind_group, prepare_view_targets).in_set(RenderSet::Queue))
+            .add_systems(
+                (
+                    extract_point_cloud,
+                    clippling_planes::extract_clipping_planes,
+                )
+                    .in_schedule(ExtractSchedule),
+            )
+            .add_systems(
+                (prepare_point_cloud_bind_group, prepare_view_targets).in_set(RenderSet::Queue),
+            )
             .add_systems((clippling_planes::prepare_clipping_planes,).in_set(RenderSet::Prepare))
             .init_resource::<clippling_planes::UniformBufferOfGpuClippingPlaneRanges>()
             .init_resource::<PointCloudBindGroup>()
@@ -86,17 +94,15 @@ impl Plugin for PointCloudPlugin {
             .unwrap();
 
         draw_3d_graph.add_node(PointCloudNode::NAME, point_cloud_node);
-        draw_3d_graph
-            .add_node_edge(
-                bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
-                PointCloudNode::NAME,
-            );
-        draw_3d_graph
-            .add_slot_edge(
-                draw_3d_graph.input_node().id,
-                bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
-                PointCloudNode::NAME,
-                PointCloudNode::IN_VIEW,
-            );
+        draw_3d_graph.add_node_edge(
+            bevy::core_pipeline::core_3d::graph::node::MAIN_PASS,
+            PointCloudNode::NAME,
+        );
+        draw_3d_graph.add_slot_edge(
+            draw_3d_graph.input_node().id,
+            bevy::core_pipeline::core_3d::graph::input::VIEW_ENTITY,
+            PointCloudNode::NAME,
+            PointCloudNode::IN_VIEW,
+        );
     }
 }

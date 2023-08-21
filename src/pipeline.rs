@@ -198,7 +198,7 @@ impl PointCloudPipeline {
                         binding: 0,
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Texture {
-                            sample_type: TextureSampleType::Depth,
+                            sample_type: TextureSampleType::Float { filterable: false },
                             view_dimension: TextureViewDimension::D2,
                             multisampled: msaa > 1,
                         },
@@ -255,11 +255,18 @@ impl PointCloudPipeline {
                     defs
                 },
                 entry_point: "main".into(),
-                targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::Rgba8UnormSrgb,
-                    blend: Some(BlendState::REPLACE),
-                    write_mask: ColorWrites::ALL,
-                })],
+                targets: vec![
+                    Some(ColorTargetState {
+                        format: TextureFormat::Rgba8UnormSrgb,
+                        blend: Some(BlendState::REPLACE),
+                        write_mask: ColorWrites::ALL,
+                    }),
+                    Some(ColorTargetState {
+                        format: TextureFormat::R32Float,
+                        blend: Some(BlendState::REPLACE),
+                        write_mask: ColorWrites::RED,
+                    }),
+                ],
             }),
             primitive: PrimitiveState {
                 front_face: FrontFace::Ccw,
@@ -291,7 +298,7 @@ impl PointCloudPipeline {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            push_constant_ranges: default()
+            push_constant_ranges: default(),
         };
 
         let eye_dome_pipeline_descriptor = RenderPipelineDescriptor {
@@ -355,12 +362,10 @@ impl PointCloudPipeline {
                     write_mask: ColorWrites::COLOR,
                 })],
             }),
-            push_constant_ranges: vec![
-                PushConstantRange {
-                    stages: ShaderStages::FRAGMENT,
-                    range: 0..std::mem::size_of::<f32>() as u32
-                }
-            ]
+            push_constant_ranges: vec![PushConstantRange {
+                stages: ShaderStages::FRAGMENT,
+                range: 0..std::mem::size_of::<f32>() as u32,
+            }],
         };
 
         let pipeline_cache = world.resource::<PipelineCache>();
@@ -416,9 +421,9 @@ pub(crate) fn prepare_view_targets(
                     mip_level_count: 1,
                     sample_count: msaa,
                     dimension: TextureDimension::D2,
-                    format: TextureFormat::Depth32Float,
+                    format: TextureFormat::R32Float,
                     usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-                    view_formats: &[]
+                    view_formats: &[],
                 };
                 let cached_depth_texture = texture_cache.get(&render_device, depth_descriptor);
 

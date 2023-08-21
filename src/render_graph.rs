@@ -7,7 +7,8 @@ use bevy::render::extract_component::DynamicUniformIndex;
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_graph::{Node, SlotInfo, SlotType};
 use bevy::render::render_resource::{
-    LoadOp, Operations, PipelineCache, RenderPassDepthStencilAttachment, RenderPassDescriptor, ShaderStages,
+    LoadOp, Operations, PipelineCache, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
+    RenderPassDescriptor, ShaderStages,
 };
 use bevy::render::view::{
     ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset, VisibleEntities,
@@ -70,7 +71,7 @@ impl Node for PointCloudNode {
             view,
             camera,
             target,
-            _depth,
+            depth,
             view_uniform_offset,
             eye_dome_view_target,
             visible_entities,
@@ -81,26 +82,35 @@ impl Node for PointCloudNode {
             } // No window
         };
 
-        let mut tracked_pass = render_context
-            .begin_tracked_render_pass(RenderPassDescriptor {
-                label: Some("point_cloud"),
-                // NOTE: The opaque pass loads the color
-                // buffer as well as writing to it.
-                color_attachments: &[Some(target.get_color_attachment(Operations {
+        let mut tracked_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
+            label: Some("point_cloud"),
+            // NOTE: The opaque pass loads the color
+            // buffer as well as writing to it.
+            color_attachments: &[
+                Some(target.get_color_attachment(Operations {
                     load: LoadOp::Load,
                     store: true,
-                }))],
-                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                })),
+                Some(RenderPassColorAttachment {
                     view: &eye_dome_view_target.depth_texture_view,
-                    // NOTE: The opaque main pass loads the depth buffer and possibly overwrites it
-                    depth_ops: Some(Operations {
-                        // NOTE: 0.0 is the far plane due to bevy's use of reverse-z projections.
-                        load: LoadOp::Clear(0.0),
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::BLACK.into()),
                         store: true,
-                    }),
-                    stencil_ops: None,
+                    },
                 }),
-            });
+            ],
+            depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                view: &depth.view,
+                // NOTE: The opaque main pass loads the depth buffer and possibly overwrites it
+                depth_ops: Some(Operations {
+                    // NOTE: 0.0 is the far plane due to bevy's use of reverse-z projections.
+                    load: LoadOp::Load,
+                    store: true,
+                }),
+                stencil_ops: None,
+            }),
+        });
         if let Some(viewport) = camera.viewport.as_ref() {
             tracked_pass.set_camera_viewport(viewport);
         }
@@ -144,17 +154,16 @@ impl Node for PointCloudNode {
         }
         drop(tracked_pass);
 
-        let mut tracked_pass = render_context
-            .begin_tracked_render_pass(RenderPassDescriptor {
-                label: Some("eye_dome_lighting"),
-                // NOTE: The opaque pass loads the color
-                // buffer as well as writing to it.
-                color_attachments: &[Some(target.get_color_attachment(Operations {
-                    load: LoadOp::Load,
-                    store: true,
-                }))],
-                depth_stencil_attachment: None,
-            });
+        let mut tracked_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
+            label: Some("eye_dome_lighting"),
+            // NOTE: The opaque pass loads the color
+            // buffer as well as writing to it.
+            color_attachments: &[Some(target.get_color_attachment(Operations {
+                load: LoadOp::Load,
+                store: true,
+            }))],
+            depth_stencil_attachment: None,
+        });
         if let Some(viewport) = camera.viewport.as_ref() {
             tracked_pass.set_camera_viewport(viewport);
         }
