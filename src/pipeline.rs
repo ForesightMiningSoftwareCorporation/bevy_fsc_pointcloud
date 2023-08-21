@@ -36,7 +36,6 @@ pub struct PointCloudPipeline {
     pub eye_dome_pipeline_id: CachedRenderPipelineId,
     pub eye_dome_image_layout: BindGroupLayout,
 
-    pub sampler: Sampler,
     pub instanced_point_quad: Buffer,
 
     pub colored: bool,
@@ -111,10 +110,6 @@ impl PointCloudPipeline {
                 )
             },
             usage: BufferUsages::VERTEX,
-        });
-        let sampler = render_device.create_sampler(&SamplerDescriptor {
-            label: "Eye Dome Shading Sampler".into(),
-            ..Default::default()
         });
         let view_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("PointCloudViewLabel"),
@@ -193,24 +188,16 @@ impl PointCloudPipeline {
         let eye_dome_image_layout =
             render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some("EyeDomeImageLayout"),
-                entries: &[
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Texture {
-                            sample_type: TextureSampleType::Float { filterable: false },
-                            view_dimension: TextureViewDimension::D2,
-                            multisampled: msaa > 1,
-                        },
-                        count: None,
+                entries: &[BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        sample_type: TextureSampleType::Float { filterable: false },
+                        view_dimension: TextureViewDimension::D2,
+                        multisampled: msaa > 1,
                     },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Sampler(SamplerBindingType::NonFiltering),
-                        count: None,
-                    },
-                ],
+                    count: None,
+                }],
             });
         let pipeline_descriptor = RenderPipelineDescriptor {
             label: Some("point_cloud_pipeline".into()),
@@ -380,7 +367,6 @@ impl PointCloudPipeline {
             entity_layout,
             eye_dome_pipeline_id,
             eye_dome_image_layout,
-            sampler,
             instanced_point_quad,
             colored,
             animated,
@@ -430,20 +416,12 @@ pub(crate) fn prepare_view_targets(
                 let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
                     label: "Eye Dome Bind Group".into(),
                     layout: &pipeline.eye_dome_image_layout,
-                    entries: &[
-                        BindGroupEntry {
-                            binding: 0,
-                            resource: bevy::render::render_resource::BindingResource::TextureView(
-                                &cached_depth_texture.default_view,
-                            ),
-                        },
-                        BindGroupEntry {
-                            binding: 1,
-                            resource: bevy::render::render_resource::BindingResource::Sampler(
-                                &pipeline.sampler,
-                            ),
-                        },
-                    ],
+                    entries: &[BindGroupEntry {
+                        binding: 0,
+                        resource: bevy::render::render_resource::BindingResource::TextureView(
+                            &cached_depth_texture.default_view,
+                        ),
+                    }],
                 });
                 EyeDomeViewTarget {
                     depth_texture: cached_depth_texture.texture,

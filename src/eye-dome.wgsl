@@ -8,9 +8,6 @@ var input_texture: texture_2d<f32>;
 
 var<push_constant> edl_strength: f32;
 
-
-@group(0) @binding(1) var s: sampler;
-
 @vertex
 fn vertex(
     @location(0) position: vec2<f32>
