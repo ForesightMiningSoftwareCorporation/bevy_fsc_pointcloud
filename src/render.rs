@@ -4,6 +4,7 @@ use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_resource::{
     BufferDescriptor, CachedRenderPipelineId, PipelineCache, SpecializedRenderPipelines,
 };
+use bevy::render::renderer::RenderQueue;
 use bevy::render::view::VisibleEntities;
 use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
@@ -119,6 +120,128 @@ pub struct PreparedPointCloudAsset {
 }
 
 impl PreparedPointCloudAsset {
+    pub fn seek(
+        &mut self,
+        seek_to: f32, // time from the start of the animation to seek to
+        queue: &RenderQueue,
+        render_device: &RenderDevice,
+        pipeline: &PointCloudPipeline,
+    ) {
+        let (prev_animation_buffer, next_animation_buffer) = self.animation_buffer.as_mut().expect(
+            "Cannot call PreparedPointCloudAsset::seek on an instance without an animation",
+        );
+        let frames = match self.frames.as_ref().unwrap() {
+            Frames::I8(frames) => frames,
+            _ => todo!(), // make some kinda trait abstraction
+        };
+
+        self.animation_time = seek_to;
+
+        // If we're already in the correct frame, adjust interpolation and exit
+        let current_frame_end_time = frames[self.current_animation_frame].time / 1000.;
+        if (self.animation_frame_start_time..current_frame_end_time).contains(&self.animation_time)
+        {
+            let duration = current_frame_end_time - self.animation_frame_start_time;
+            let delta = self.animation_time - self.animation_frame_start_time;
+            let interpolation = (delta / duration).min(1.0);
+
+            info!("just interpolation");
+            queue.write_buffer(
+                &next_animation_buffer,
+                0,
+                bytemuck::bytes_of(&interpolation),
+            );
+
+            return;
+        }
+
+        let to_enter = if self.current_animation_frame == frames.len() - 1 && {
+            // if we're on the last frame, check if we're seeking to the first frame first
+            let first_frame_end_time = frames[0].time / 1000.;
+            self.animation_time < first_frame_end_time
+        } {
+            0
+        } else if self.current_animation_frame != frames.len() - 1 && {
+            // if we're not on the last frame, check if we're seeking to the next frame first
+            let next_frame_end_time = frames[self.current_animation_frame + 1].time / 1000.;
+            (current_frame_end_time..next_frame_end_time).contains(&self.animation_time)
+        } {
+            self.current_animation_frame + 1
+        } else {
+            // if we're seeking to neither, find what frame we're seeking to using binary search
+            match frames.binary_search_by(|f| (f.time / 1000.).partial_cmp(&seek_to).unwrap()) {
+                // Landed on the exact end of a frame
+                // If its the last frame, this is out of bounds, and we can panic
+                // If its not, we will enter the next frame
+                Ok(index) if index == frames.len() - 1 => panic!("Out of bounds seek"),
+                Ok(index) => index + 1,
+                // The index is to the frame where `delta_seconds` is smaller than the indexed frame, but larger than the previous,
+                // or its out of bounds
+                Err(index) if index == frames.len() => panic!("Out of bounds seek"),
+                Err(index) => index,
+            }
+        };
+
+        let mut view = vec![0.0; self.num_points as usize * 3];
+
+        if to_enter == self.current_animation_frame + 1 {
+            // We're going to the next frame, so the start time is simply the current end time
+            self.animation_frame_start_time = current_frame_end_time;
+            info!("next frame");
+        } else {
+            // We're not going to the next frame, so the current next_animation_buffer cannot
+            // be used as the upcoming prev_animation_buffer directly.
+            // Adjust the next_animation_buffer to point to the frame before the one we're entering
+            // or zero it out if we're entering the first frame
+
+            info!("resetting");
+            if to_enter == 0 {
+                // We're entering the first frame, set the start time to zero
+                self.animation_frame_start_time = 0.;
+            } else {
+                // We're not entering the first frame, setup `view` with the values in frame `to_enter - 1`
+                // Also set the frame start time
+                for (i, arr) in frames[to_enter - 1].into_iter().enumerate() {
+                    let arr = Vec3::from(arr) * self.animation_scale;
+                    for j in 0..3 {
+                        view[i * 3 + j] = arr[j];
+                    }
+                }
+                self.animation_frame_start_time = frames[to_enter - 1].time / 1000.;
+            }
+
+            // Write the buffer
+            queue.write_buffer(next_animation_buffer, 4, bytemuck::cast_slice(&view));
+        }
+
+        self.current_animation_frame = to_enter;
+
+        // Swap the buffers
+        std::mem::swap(next_animation_buffer, prev_animation_buffer);
+
+        // Setup view with values for the frame we're entering
+        for (i, arr) in frames[self.current_animation_frame].into_iter().enumerate() {
+            let arr = Vec3::from(arr) * self.animation_scale;
+            for j in 0..3 {
+                view[i * 3 + j] = arr[j];
+            }
+        }
+
+        // Calculate and write interpolation for the frame we just entered
+        let current_frame_end_time = frames[self.current_animation_frame].time / 1000.;
+        let duration = current_frame_end_time - self.animation_frame_start_time;
+        let delta = self.animation_time - self.animation_frame_start_time;
+        let interpolation = (delta / duration).min(1.0);
+
+        queue.write_buffer(next_animation_buffer, 0, bytemuck::bytes_of(&interpolation));
+
+        // Write the values into next_animation_buffer
+        queue.write_buffer(next_animation_buffer, 4, bytemuck::cast_slice(&view));
+
+        // Update the bind group, since we swapped the buffers.
+        self.update_bind_group(&render_device, &pipeline);
+    }
+
     pub fn update_bind_group(
         &mut self,
         render_device: &RenderDevice,

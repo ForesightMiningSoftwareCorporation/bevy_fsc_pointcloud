@@ -13,6 +13,7 @@ use bevy::{
     },
     utils::HashMap,
 };
+use opd_parser::Frames;
 
 use crate::{
     clippling_planes::UniformBufferOfGpuClippingPlaneRanges, PointCloudAsset, PointCloudUniform,
@@ -539,62 +540,17 @@ pub fn prepare_animated_assets(
         return;
     }
     for (_handle, asset) in assets.iter_mut() {
-        if let Some((prev_animation_buffer, next_animation_buffer)) =
-            asset.animation_buffer.as_mut()
-        {
-            let mut view = vec![0.0; asset.num_points as usize * 3];
-
-            match asset.frames.as_ref().unwrap() {
-                opd_parser::Frames::I8(frames) => {
-                    let current_frame = &frames[asset.current_animation_frame];
-                    asset.animation_time += time.delta_seconds() * playback.speed;
-
-                    let duration = current_frame.time / 1000.0 - asset.animation_frame_start_time;
-                    let delta = asset.animation_time - asset.animation_frame_start_time;
-                    let interpolation = (delta / duration).min(1.0);
-                    queue.write_buffer(&next_animation_buffer, 0, unsafe {
-                        std::slice::from_raw_parts(
-                            &interpolation as *const f32 as *const u8,
-                            std::mem::size_of::<f32>(),
-                        )
-                    });
-                    if current_frame.time / 1000.0 > asset.animation_time {
-                        continue;
-                    }
-                    asset.animation_frame_start_time = asset.animation_time;
-                    asset.current_animation_frame += 1;
-                    if asset.current_animation_frame >= frames.len() {
-                        asset.current_animation_frame = 0;
-                        asset.animation_time = 0.0;
-                    }
-
-                    for (i, arr) in frames[asset.current_animation_frame]
-                        .into_iter()
-                        .enumerate()
-                    {
-                        let arr = Vec3::from(arr) * asset.animation_scale;
-                        for j in 0..3 {
-                            view[i * 3 + j] = arr[j];
-                        }
-                    }
-                }
-                _ => todo!(),
+        if asset.animation_buffer.is_some() {
+            let frames = match asset.frames.as_ref().unwrap() {
+                Frames::I8(frames) => frames,
+                _ => todo!(), // make some kinda trait abstraction
             };
-            std::mem::swap(next_animation_buffer, prev_animation_buffer);
-            let zero: f32 = 0.0;
-            queue.write_buffer(next_animation_buffer, 0, unsafe {
-                std::slice::from_raw_parts(
-                    &zero as *const f32 as *const u8,
-                    std::mem::size_of::<f32>(),
-                )
-            });
-            queue.write_buffer(next_animation_buffer, 4, unsafe {
-                std::slice::from_raw_parts(
-                    view.as_ptr() as *const u8,
-                    std::mem::size_of_val(view.as_slice()),
-                )
-            });
-            asset.update_bind_group(&render_device, &pipeline);
+            let animation_duration = frames.last().unwrap().time / 1000.;
+            let delta = time.delta_seconds() * playback.speed;
+
+            let seek_to = (asset.animation_time + delta) % animation_duration;
+
+            asset.seek(seek_to, &queue, &render_device, &pipeline);
         }
     }
 }
