@@ -24,3 +24,4 @@ bytemuck = "1.13.1"
 
 [dev-dependencies]
 bevy_flycam = "0.10"
+bevy_egui = "0.20"

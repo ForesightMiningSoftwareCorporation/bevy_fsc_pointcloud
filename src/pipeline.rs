@@ -13,10 +13,10 @@ use bevy::{
     },
     utils::HashMap,
 };
-use opd_parser::Frames;
 
 use crate::{
-    clippling_planes::UniformBufferOfGpuClippingPlaneRanges, PointCloudAsset, PointCloudUniform,
+    clippling_planes::UniformBufferOfGpuClippingPlaneRanges, PointCloudAsset,
+    PointCloudPlaybackControls, PointCloudUniform,
 };
 
 pub(crate) const POINT_CLOUD_VERT_SHADER_HANDLE: HandleUntyped =
@@ -506,21 +506,7 @@ pub(crate) fn queue_view_targets(
     }
 }
 
-#[derive(Resource, Clone)]
-pub struct PointCloudPlaybackControl {
-    pub playing: bool,
-    pub speed: f32,
-}
-impl Default for PointCloudPlaybackControl {
-    fn default() -> Self {
-        Self {
-            playing: true,
-            speed: 5.0,
-        }
-    }
-}
-
-impl ExtractResource for PointCloudPlaybackControl {
+impl ExtractResource for PointCloudPlaybackControls {
     type Source = Self;
 
     fn extract_resource(source: &Self::Source) -> Self {
@@ -533,24 +519,14 @@ pub fn prepare_animated_assets(
     render_device: Res<RenderDevice>,
     pipeline: Res<PointCloudPipeline>,
     mut assets: ResMut<RenderAssets<PointCloudAsset>>,
-    playback: ResMut<PointCloudPlaybackControl>,
-    time: Res<Time>,
+    playback: ResMut<PointCloudPlaybackControls>,
 ) {
-    if !playback.playing {
-        return;
-    }
-    for (_handle, asset) in assets.iter_mut() {
+    for (handle, asset) in assets.iter_mut() {
         if asset.animation_buffer.is_some() {
-            let frames = match asset.frames.as_ref().unwrap() {
-                Frames::I8(frames) => frames,
-                _ => todo!(), // make some kinda trait abstraction
-            };
-            let animation_duration = frames.last().unwrap().time / 1000.;
-            let delta = time.delta_seconds() * playback.speed;
-
-            let seek_to = (asset.animation_time + delta) % animation_duration;
-
-            asset.seek(seek_to, &queue, &render_device, &pipeline);
+            let playback = playback.controls.get(handle).copied().unwrap_or_default();
+            if playback.time != asset.animation_time {
+                asset.seek(playback.time, &queue, &render_device, &pipeline);
+            }
         }
     }
 }

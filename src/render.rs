@@ -145,7 +145,6 @@ impl PreparedPointCloudAsset {
             let delta = self.animation_time - self.animation_frame_start_time;
             let interpolation = (delta / duration).min(1.0);
 
-            info!("just interpolation");
             queue.write_buffer(
                 &next_animation_buffer,
                 0,
@@ -171,9 +170,9 @@ impl PreparedPointCloudAsset {
             // if we're seeking to neither, find what frame we're seeking to using binary search
             match frames.binary_search_by(|f| (f.time / 1000.).partial_cmp(&seek_to).unwrap()) {
                 // Landed on the exact end of a frame
-                // If its the last frame, this is out of bounds, and we can panic
+                // If its the last frame, stay on the last frame
                 // If its not, we will enter the next frame
-                Ok(index) if index == frames.len() - 1 => panic!("Out of bounds seek"),
+                Ok(index) if index == frames.len() - 1 => index,
                 Ok(index) => index + 1,
                 // The index is to the frame where `delta_seconds` is smaller than the indexed frame, but larger than the previous,
                 // or its out of bounds
@@ -187,14 +186,12 @@ impl PreparedPointCloudAsset {
         if to_enter == self.current_animation_frame + 1 {
             // We're going to the next frame, so the start time is simply the current end time
             self.animation_frame_start_time = current_frame_end_time;
-            info!("next frame");
         } else {
             // We're not going to the next frame, so the current next_animation_buffer cannot
             // be used as the upcoming prev_animation_buffer directly.
             // Adjust the next_animation_buffer to point to the frame before the one we're entering
             // or zero it out if we're entering the first frame
 
-            info!("resetting");
             if to_enter == 0 {
                 // We're entering the first frame, set the start time to zero
                 self.animation_frame_start_time = 0.;
@@ -214,18 +211,25 @@ impl PreparedPointCloudAsset {
             queue.write_buffer(next_animation_buffer, 4, bytemuck::cast_slice(&view));
         }
 
-        self.current_animation_frame = to_enter;
-
         // Swap the buffers
         std::mem::swap(next_animation_buffer, prev_animation_buffer);
 
-        // Setup view with values for the frame we're entering
-        for (i, arr) in frames[self.current_animation_frame].into_iter().enumerate() {
-            let arr = Vec3::from(arr) * self.animation_scale;
-            for j in 0..3 {
-                view[i * 3 + j] = arr[j];
+        // If we're moving to the previous frame, the values in the next_animation_buffer are
+        // already set up for it thanks to the swap, so we can skip this step
+        if to_enter + 1 != self.current_animation_frame {
+            // Setup view with values for the frame we're entering
+            for (i, arr) in frames[to_enter].into_iter().enumerate() {
+                let arr = Vec3::from(arr) * self.animation_scale;
+                for j in 0..3 {
+                    view[i * 3 + j] = arr[j];
+                }
             }
+
+            // Write the values into next_animation_buffer
+            queue.write_buffer(next_animation_buffer, 4, bytemuck::cast_slice(&view));
         }
+
+        self.current_animation_frame = to_enter;
 
         // Calculate and write interpolation for the frame we just entered
         let current_frame_end_time = frames[self.current_animation_frame].time / 1000.;
@@ -234,9 +238,6 @@ impl PreparedPointCloudAsset {
         let interpolation = (delta / duration).min(1.0);
 
         queue.write_buffer(next_animation_buffer, 0, bytemuck::bytes_of(&interpolation));
-
-        // Write the values into next_animation_buffer
-        queue.write_buffer(next_animation_buffer, 4, bytemuck::cast_slice(&view));
 
         // Update the bind group, since we swapped the buffers.
         self.update_bind_group(&render_device, &pipeline);
