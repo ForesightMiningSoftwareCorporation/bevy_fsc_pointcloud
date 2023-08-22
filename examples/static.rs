@@ -8,10 +8,7 @@ fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin::default()))
         .add_plugin(PlayerPlugin)
-        .add_plugin(bevy_fsc_point_cloud::PointCloudPlugin {
-            colored: true,
-            animated: false,
-        })
+        .add_plugin(bevy_fsc_point_cloud::PointCloudPlugin)
         .add_startup_system(startup);
     app.run();
 }

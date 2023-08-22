@@ -14,7 +14,7 @@ use bevy::{
         extract_resource::ExtractResourcePlugin,
         render_asset::{PrepareAssetSet, RenderAssetPlugin},
         render_graph::RenderGraph,
-        render_resource::ShaderStage,
+        render_resource::{ShaderStage, SpecializedRenderPipelines},
         RenderApp, RenderSet,
     },
 };
@@ -28,14 +28,10 @@ pub use render::*;
 pub use render_graph::*;
 
 #[derive(Default)]
-pub struct PointCloudPlugin {
-    pub colored: bool,
-    pub animated: bool,
-}
+pub struct PointCloudPlugin;
 
 impl Plugin for PointCloudPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        let point_cloud_pipeline = PointCloudPipeline::from_app(app, self.colored, self.animated);
         app.add_asset::<PointCloudAsset>();
 
         #[cfg(feature = "las")]
@@ -48,10 +44,10 @@ impl Plugin for PointCloudPlugin {
             ),
         )
         .add_plugin(UniformComponentPlugin::<PointCloudUniform>::default());
-        if self.animated {
-            app.init_resource::<PointCloudPlaybackControl>()
-                .add_plugin(ExtractResourcePlugin::<PointCloudPlaybackControl>::default());
-        }
+
+        app.init_resource::<PointCloudPlaybackControl>()
+            .add_plugin(ExtractResourcePlugin::<PointCloudPlaybackControl>::default());
+
         load_internal_asset!(app, POINT_CLOUD_VERT_SHADER_HANDLE, "shader.vert", |s| {
             Shader::from_glsl(s, ShaderStage::Vertex)
         });
@@ -74,18 +70,26 @@ impl Plugin for PointCloudPlugin {
                 )
                     .in_schedule(ExtractSchedule),
             )
-            .add_systems(
-                (prepare_point_cloud_bind_group, prepare_view_targets).in_set(RenderSet::Queue),
-            )
             .add_systems((clippling_planes::prepare_clipping_planes,).in_set(RenderSet::Prepare))
+            .add_systems(
+                (
+                    queue_point_cloud_bind_group,
+                    queue_view_targets,
+                    queue_point_cloud,
+                )
+                    .in_set(RenderSet::Queue),
+            )
             .init_resource::<clippling_planes::UniformBufferOfGpuClippingPlaneRanges>()
             .init_resource::<PointCloudBindGroup>()
-            .insert_resource(point_cloud_pipeline);
-        if self.animated {
-            render_app
-                .add_systems((prepare_animated_assets,).in_set(RenderSet::Prepare))
-                .init_resource::<PointCloudPlaybackControl>();
-        }
+            .init_resource::<PointCloudPipeline>()
+            .init_resource::<SpecializedRenderPipelines<PointCloudPipeline>>()
+            .init_resource::<EyeDomePipeline>()
+            .init_resource::<SpecializedRenderPipelines<EyeDomePipeline>>();
+
+        render_app
+            .add_systems((prepare_animated_assets,).in_set(RenderSet::Prepare))
+            .init_resource::<PointCloudPlaybackControl>();
+
         let point_cloud_node = PointCloudNode::new(&mut render_app.world);
 
         let mut render_graph = render_app.world.resource_mut::<RenderGraph>();

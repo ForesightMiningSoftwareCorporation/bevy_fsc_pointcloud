@@ -6,10 +6,7 @@ fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin::default()))
         .add_plugin(PlayerPlugin)
-        .add_plugin(bevy_fsc_point_cloud::PointCloudPlugin {
-            colored: false,
-            animated: true,
-        })
+        .add_plugin(bevy_fsc_point_cloud::PointCloudPlugin)
         .insert_resource(PointCloudPlaybackControl {
             speed: 1.0,
             ..Default::default()

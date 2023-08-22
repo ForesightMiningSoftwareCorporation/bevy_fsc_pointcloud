@@ -1,5 +1,10 @@
+use crate::PointCloudPipelineKey;
 use crate::{pipeline::PointCloudPipeline, PointCloudAsset};
-use bevy::render::render_resource::BufferDescriptor;
+use bevy::render::render_asset::RenderAssets;
+use bevy::render::render_resource::{
+    BufferDescriptor, CachedRenderPipelineId, PipelineCache, SpecializedRenderPipelines,
+};
+use bevy::render::view::VisibleEntities;
 use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     prelude::*,
@@ -48,6 +53,56 @@ pub(crate) fn extract_point_cloud(
     commands.insert_or_spawn_batch(values);
 }
 
+#[derive(Component)]
+pub struct PointCloudDrawList {
+    pub list: Vec<PointCloudDrawData>,
+}
+
+pub struct PointCloudDrawData {
+    pub entity: Entity,
+    pub pipeline_id: CachedRenderPipelineId,
+}
+
+pub(crate) fn queue_point_cloud(
+    pipeline: Res<PointCloudPipeline>,
+    mut pipelines: ResMut<SpecializedRenderPipelines<PointCloudPipeline>>,
+    cache: Res<PipelineCache>,
+    views: Query<(Entity, &VisibleEntities)>,
+    items: Query<&Handle<PointCloudAsset>>,
+    point_clouds: Res<RenderAssets<PointCloudAsset>>,
+    msaa: Option<Res<Msaa>>,
+    mut commands: Commands,
+) {
+    let msaa = msaa.map(|a| a.samples()).unwrap_or(1);
+    for (view_entity, entities) in &views {
+        let mut list = vec![];
+        for &entity in &entities.entities {
+            if let Some(asset) = items
+                .get(entity)
+                .ok()
+                .and_then(|handle| point_clouds.get(handle))
+            {
+                let key = PointCloudPipelineKey {
+                    colored: asset.colored,
+                    animated: asset.animation_buffer.is_some(),
+                    msaa,
+                };
+
+                let pipeline_id = pipelines.specialize(&cache, &pipeline, key);
+                list.push(PointCloudDrawData {
+                    entity,
+                    pipeline_id,
+                });
+            }
+        }
+        if !list.is_empty() {
+            commands
+                .entity(view_entity)
+                .insert(PointCloudDrawList { list });
+        }
+    }
+}
+
 pub struct PreparedPointCloudAsset {
     pub buffer: Buffer,
     pub num_points: u32,
@@ -59,6 +114,8 @@ pub struct PreparedPointCloudAsset {
     pub animation_time: f32,
     pub animation_frame_start_time: f32,
     pub animation_scale: Vec3,
+
+    pub colored: bool,
 }
 
 impl PreparedPointCloudAsset {
@@ -83,7 +140,11 @@ impl PreparedPointCloudAsset {
         }
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             label: "point cloud buffer bind group".into(),
-            layout: &pipeline.entity_layout,
+            layout: if self.animation_buffer.is_some() {
+                &pipeline.animated_entity_layout
+            } else {
+                &pipeline.entity_layout
+            },
             entries: &bind_group_entires,
         });
         self.bind_group = Some(bind_group);
@@ -149,6 +210,9 @@ impl RenderAsset for PointCloudAsset {
             animation_time: 0.0,
             animation_frame_start_time: 0.0,
             animation_scale: extracted_asset.animation_scale,
+            colored: extracted_asset
+                .mesh
+                .contains_attribute(Mesh::ATTRIBUTE_COLOR),
         };
         asset.update_bind_group(render_device, pipeline);
         Ok(asset)
