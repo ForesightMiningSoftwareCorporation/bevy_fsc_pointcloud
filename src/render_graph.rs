@@ -163,9 +163,11 @@ impl Node for PointCloudNode {
             1.0 / view.projection.z_axis.z // near - far
         };
 
-        tracked_pass.set_push_constants(ShaderStages::FRAGMENT, 0, unsafe {
-            std::slice::from_raw_parts(&edl_strength as *const f32 as *const u8, 4)
-        });
+        tracked_pass.set_push_constants(
+            ShaderStages::FRAGMENT,
+            0,
+            bytemuck::bytes_of(&edl_strength),
+        );
         tracked_pass.set_bind_group(0, &eye_dome_view_target.bind_group, &[]);
         tracked_pass.set_vertex_buffer(0, point_cloud_pipeline.instanced_point_quad.slice(0..32));
         tracked_pass.draw(0..4, 0..1);

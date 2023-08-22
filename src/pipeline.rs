@@ -107,12 +107,7 @@ impl FromWorld for PointCloudPipeline {
         let render_device = world.resource::<RenderDevice>();
         let instanced_point_quad = render_device.create_buffer_with_data(&BufferInitDescriptor {
             label: "instanced point quad".into(),
-            contents: unsafe {
-                std::slice::from_raw_parts(
-                    QUAD_VERTEX_BUF.as_ptr() as *const _,
-                    std::mem::size_of_val(QUAD_VERTEX_BUF),
-                )
-            },
+            contents: bytemuck::cast_slice(QUAD_VERTEX_BUF),
             usage: BufferUsages::VERTEX,
         });
         let view_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
