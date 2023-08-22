@@ -1,6 +1,7 @@
 #version 450
 
 layout(location = 0) out vec4 o_Target;
+layout(location = 1) out float o_Depth;
 layout(location = 0) in vec2 in_Point_Location;
 layout(location = 1) in vec3 in_Color;
 
@@ -39,5 +40,7 @@ void main()
     float offseted_depth = depth + point_size * depth_offset;
 
     float z_near = gl_FragCoord.z * depth;
-    gl_FragDepth = z_near / offseted_depth;
+    float depth_output = z_near / offseted_depth;
+    gl_FragDepth = depth_output;
+    o_Depth = depth_output;
 }
