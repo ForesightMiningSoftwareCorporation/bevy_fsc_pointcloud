@@ -1,5 +1,5 @@
-use crate::PointCloudPipelineKey;
 use crate::{pipeline::PointCloudPipeline, PointCloudAsset};
+use crate::{PointCloudPipelineKey, ATTRIBUTE_COLOR};
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_resource::{
     BufferDescriptor, CachedRenderPipelineId, PipelineCache, SpecializedRenderPipelines,
@@ -334,9 +334,7 @@ impl RenderAsset for PointCloudAsset {
             animation_time: 0.0,
             animation_frame_start_time: 0.0,
             animation_scale: extracted_asset.animation_scale,
-            colored: extracted_asset
-                .mesh
-                .contains_attribute(Mesh::ATTRIBUTE_COLOR),
+            colored: extracted_asset.mesh.contains_attribute(ATTRIBUTE_COLOR),
         };
         asset.update_bind_group(render_device, pipeline);
         Ok(asset)
