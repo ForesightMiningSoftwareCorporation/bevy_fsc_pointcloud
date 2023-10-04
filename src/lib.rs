@@ -94,11 +94,7 @@ impl Plugin for PointCloudPlugin {
                     .in_set(RenderSet::Queue),
             )
             .init_resource::<clippling_planes::UniformBufferOfGpuClippingPlaneRanges>()
-            .init_resource::<PointCloudBindGroup>()
-            .init_resource::<PointCloudPipeline>()
-            .init_resource::<SpecializedRenderPipelines<PointCloudPipeline>>()
-            .init_resource::<EyeDomePipeline>()
-            .init_resource::<SpecializedRenderPipelines<EyeDomePipeline>>();
+            .init_resource::<PointCloudBindGroup>();
 
         render_app
             .add_systems(
@@ -114,5 +110,14 @@ impl Plugin for PointCloudPlugin {
                 bevy::core_pipeline::core_3d::graph::node::END_MAIN_PASS,
                 PointCloudNode::NAME,
             );
+    }
+
+    fn finish(&self, app: &mut App) {
+        let render_app = app.sub_app_mut(RenderApp);
+        render_app
+            .init_resource::<PointCloudPipeline>()
+            .init_resource::<SpecializedRenderPipelines<PointCloudPipeline>>()
+            .init_resource::<EyeDomePipeline>()
+            .init_resource::<SpecializedRenderPipelines<EyeDomePipeline>>();
     }
 }
