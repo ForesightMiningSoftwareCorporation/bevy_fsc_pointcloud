@@ -97,10 +97,7 @@ impl Plugin for PointCloudPlugin {
             .init_resource::<PointCloudBindGroup>();
 
         render_app
-            .add_systems(
-                Render,
-                (prepare_animated_assets,).in_set(RenderSet::Prepare),
-            )
+            .add_systems(Render, prepare_animated_assets.in_set(RenderSet::Prepare))
             .init_resource::<PointCloudPlaybackControls>();
 
         render_app
