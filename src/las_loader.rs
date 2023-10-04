@@ -1,7 +1,7 @@
 use bevy::{
     asset::{AssetLoader, LoadedAsset},
     prelude::*,
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::{
         mesh::MeshVertexAttribute,
         render_resource::{PrimitiveTopology, VertexFormat},
@@ -43,7 +43,7 @@ impl Point {
     }
 }
 
-#[derive(TypeUuid, Clone)]
+#[derive(TypeUuid, Clone, TypePath)]
 #[uuid = "806a9a3b-04db-4e4e-b509-ab35ef3a6c43"]
 pub struct PointCloudAsset {
     pub mesh: Mesh,

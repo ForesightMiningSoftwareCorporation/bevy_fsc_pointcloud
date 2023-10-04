@@ -145,11 +145,7 @@ impl PreparedPointCloudAsset {
             let delta = self.animation_time - self.animation_frame_start_time;
             let interpolation = (delta / duration).min(1.0);
 
-            queue.write_buffer(
-                &next_animation_buffer,
-                0,
-                bytemuck::bytes_of(&interpolation),
-            );
+            queue.write_buffer(next_animation_buffer, 0, bytemuck::bytes_of(&interpolation));
 
             return;
         }
@@ -240,7 +236,7 @@ impl PreparedPointCloudAsset {
         queue.write_buffer(next_animation_buffer, 0, bytemuck::bytes_of(&interpolation));
 
         // Update the bind group, since we swapped the buffers.
-        self.update_bind_group(&render_device, &pipeline);
+        self.update_bind_group(render_device, pipeline);
     }
 
     pub fn update_bind_group(
