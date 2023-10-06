@@ -24,9 +24,9 @@ fn main() {
 struct PointCloud(Handle<PointCloudAsset>);
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn((
-        Camera3dBundle::default(),
-        FpsCameraBundle::new(
+    commands
+        .spawn(Camera3dBundle::default())
+        .insert(FpsCameraBundle::new(
             FpsCameraController {
                 translate_sensitivity: 200.0,
                 ..Default::default()
@@ -34,8 +34,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
             Vec3::new(0.0, 100.0, 0.0),
             Vec3::new(100.0, 0.0, 100.0),
             Vec3::Y,
-        ),
-    ));
+        ));
 
     let point_cloud: Handle<PointCloudAsset> = asset_server.load("replay.opd");
 
