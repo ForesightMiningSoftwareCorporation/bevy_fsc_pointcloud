@@ -1,11 +1,11 @@
 use crate::pipeline::{EyeDomeViewTarget, PointCloudBindGroup, PointCloudPipeline};
 use crate::{PointCloudAsset, PointCloudDrawList, PointCloudUniform};
-use bevy::core_pipeline::core_3d::MainPass3dNode;
+use bevy::ecs::query::QueryItem;
 use bevy::prelude::*;
 use bevy::render::camera::ExtractedCamera;
 use bevy::render::extract_component::DynamicUniformIndex;
 use bevy::render::render_asset::RenderAssets;
-use bevy::render::render_graph::{Node, SlotInfo, SlotType};
+use bevy::render::render_graph::ViewNode;
 use bevy::render::render_resource::{
     LoadOp, Operations, PipelineCache, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
     RenderPassDescriptor, ShaderStages,
@@ -13,19 +13,6 @@ use bevy::render::render_resource::{
 use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset};
 
 pub struct PointCloudNode {
-    #[allow(clippy::type_complexity)]
-    query: QueryState<
-        (
-            &'static ExtractedView,
-            &'static ExtractedCamera,
-            &'static ViewTarget,
-            &'static ViewDepthTexture,
-            &'static ViewUniformOffset,
-            &'static EyeDomeViewTarget,
-            &'static PointCloudDrawList,
-        ),
-        With<ExtractedView>,
-    >,
     entity_query: QueryState<(
         &'static Handle<PointCloudAsset>,
         &'static DynamicUniformIndex<PointCloudUniform>,
@@ -34,43 +21,41 @@ pub struct PointCloudNode {
 
 impl PointCloudNode {
     pub const NAME: &'static str = "point_cloud_node";
-    pub const IN_VIEW: &'static str = "view";
+}
 
-    pub fn new(world: &mut World) -> Self {
+impl FromWorld for PointCloudNode {
+    fn from_world(world: &mut World) -> Self {
         Self {
-            query: world.query_filtered(),
             entity_query: world.query_filtered(),
         }
     }
 }
 
-impl Node for PointCloudNode {
-    fn input(&self) -> Vec<SlotInfo> {
-        vec![SlotInfo::new(MainPass3dNode::IN_VIEW, SlotType::Entity)]
-    }
+impl ViewNode for PointCloudNode {
+    type ViewQuery = (
+        &'static ExtractedView,
+        &'static ExtractedCamera,
+        &'static ViewTarget,
+        &'static ViewDepthTexture,
+        &'static ViewUniformOffset,
+        &'static EyeDomeViewTarget,
+        &'static PointCloudDrawList,
+    );
 
     fn update(&mut self, world: &mut World) {
-        self.query.update_archetypes(world);
         self.entity_query.update_archetypes(world);
     }
 
     fn run(
         &self,
-        graph: &mut bevy::render::render_graph::RenderGraphContext,
+        _graph: &mut bevy::render::render_graph::RenderGraphContext,
         render_context: &mut bevy::render::renderer::RenderContext,
+        (view, camera, target, depth, view_uniform_offset, eye_dome_view_target, draw_list): QueryItem<Self::ViewQuery>,
         world: &World,
     ) -> Result<(), bevy::render::render_graph::NodeRunError> {
-        let view_entity = graph.get_input_entity(Self::IN_VIEW)?;
         let point_cloud_pipeline = world.resource::<PointCloudPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
         let render_assets = world.resource::<RenderAssets<PointCloudAsset>>();
-        let (view, camera, target, depth, view_uniform_offset, eye_dome_view_target, draw_list) =
-            match self.query.get_manual(world, view_entity) {
-                Ok(query) => query,
-                Err(_) => {
-                    return Ok(());
-                } // No window
-            };
 
         let mut tracked_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
             label: Some("point_cloud"),
@@ -116,9 +101,17 @@ impl Node for PointCloudNode {
         );
         tracked_pass.set_vertex_buffer(0, point_cloud_pipeline.instanced_point_quad.slice(0..32));
         for draw_data in &draw_list.list {
-            let Some(pipeline) = pipeline_cache.get_render_pipeline(draw_data.pipeline_id) else { continue; };
-            let Ok((point_cloud_asset, dynamic_index)) = self.entity_query.get_manual(world, draw_data.entity) else { continue; };
-            let Some(point_cloud_asset) = render_assets.get(point_cloud_asset) else { continue; };
+            let Some(pipeline) = pipeline_cache.get_render_pipeline(draw_data.pipeline_id) else {
+                continue;
+            };
+            let Ok((point_cloud_asset, dynamic_index)) =
+                self.entity_query.get_manual(world, draw_data.entity)
+            else {
+                continue;
+            };
+            let Some(point_cloud_asset) = render_assets.get(point_cloud_asset) else {
+                continue;
+            };
 
             tracked_pass.set_render_pipeline(pipeline);
             tracked_pass.set_bind_group(1, point_cloud_asset.bind_group.as_ref().unwrap(), &[]);
@@ -172,9 +165,5 @@ impl Node for PointCloudNode {
         tracked_pass.set_vertex_buffer(0, point_cloud_pipeline.instanced_point_quad.slice(0..32));
         tracked_pass.draw(0..4, 0..1);
         Ok(())
-    }
-
-    fn output(&self) -> Vec<SlotInfo> {
-        Vec::new()
     }
 }

@@ -1,4 +1,4 @@
-#version 460
+#version 450
 layout(location = 0) in vec2 in_Position_Point;
 
 layout(location = 0) out vec2 out_Point_Location;
@@ -102,7 +102,7 @@ void main() {
     #else
     out_Color = vec3(p.position_x % 1.0, p.position_y % 1.0, p.position_z % 1.0);
     #endif
-    
+
 
     vec2 point_size = vec2(0.0, 0.0);
     if (projection[2][3] == -1.0) {
@@ -118,7 +118,7 @@ void main() {
         point_size = vec2(point_size_world_space / max_scale);
     }
     point_size.y *= viewport.z / viewport.w;
-    
+
     out_Point_Location = in_Position_Point;
     gl_Position = out_Pos + vec4(in_Position_Point * point_size, 0.0, 0.0);
 }

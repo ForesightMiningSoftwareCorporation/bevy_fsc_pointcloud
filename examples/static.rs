@@ -1,19 +1,37 @@
 use bevy::prelude::*;
-use bevy_flycam::PlayerPlugin;
 use bevy_fsc_point_cloud::{
     ClippingPlaneBundle, ClippingPlaneRange, PointCloudAsset, PotreePointCloud,
 };
+use smooth_bevy_cameras::{
+    controllers::fps::{FpsCameraBundle, FpsCameraController, FpsCameraPlugin},
+    LookTransformPlugin,
+};
 
 fn main() {
-    let mut app = App::new();
-    app.add_plugins(DefaultPlugins.set(WindowPlugin::default()))
-        .add_plugin(PlayerPlugin)
-        .add_plugin(bevy_fsc_point_cloud::PointCloudPlugin)
-        .add_startup_system(startup);
-    app.run();
+    App::new()
+        .add_plugins((
+            DefaultPlugins.set(WindowPlugin::default()),
+            LookTransformPlugin,
+            FpsCameraPlugin::default(),
+            bevy_fsc_point_cloud::PointCloudPlugin,
+        ))
+        .add_systems(Startup, startup)
+        .run();
 }
 
 fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands
+        .spawn(Camera3dBundle::default())
+        .insert(FpsCameraBundle::new(
+            FpsCameraController {
+                translate_sensitivity: 200.0,
+                ..Default::default()
+            },
+            Vec3::new(0.0, 100.0, 0.0),
+            Vec3::new(100.0, 0.0, 100.0),
+            Vec3::Y,
+        ));
+
     let mesh: Handle<PointCloudAsset> = asset_server.load("laman_mahkota.laz");
 
     commands
