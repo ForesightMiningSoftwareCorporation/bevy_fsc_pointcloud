@@ -1,20 +1,13 @@
 #version 450
 
+#import bevy_render::view View
+
 layout(location = 0) out vec4 o_Target;
 layout(location = 1) out float o_Depth;
 layout(location = 0) in vec2 in_Point_Location;
 layout(location = 1) in vec3 in_Color;
 
-layout(set = 0, binding = 0) uniform View {
-    mat4 view_proj;
-    mat4 inverse_view_proj;
-    mat4 view;
-    mat4 inverse_view;
-    mat4 projection;
-    mat4 inverse_projection;
-    vec3 world_position;
-    vec4 viewport;
-};
+layout(set = 0, binding = 0) uniform View view;
 layout(set = 2, binding = 0) uniform Model {
     mat4 model_transform;
     float point_size;
@@ -29,11 +22,11 @@ void main()
 
     float depth = 1.0 / gl_FragCoord.w; // the world space depth
     
-    if (projection[2][3] != -1.0) {
+    if (view.projection[2][3] != -1.0) {
         // orthographic projection
         // projection[2][2] is r = 1.0 / (near - far).
         // This divides the depth offset by (near - far)
-        depth_offset *= projection[2][2];
+        depth_offset *= view.projection[2][2];
     }
 
 
