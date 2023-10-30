@@ -7,6 +7,7 @@ mod pipeline;
 mod playback;
 mod render;
 mod render_graph;
+mod wpo_loader;
 use bevy::{
     asset::load_internal_asset,
     core_pipeline::core_3d::CORE_3D,
@@ -29,6 +30,7 @@ pub use pipeline::*;
 pub use playback::*;
 pub use render::*;
 pub use render_graph::*;
+pub use wpo_loader::*;
 
 #[derive(Default)]
 pub struct PointCloudPlugin;
@@ -41,6 +43,7 @@ impl Plugin for PointCloudPlugin {
         app.add_asset_loader(LasLoader);
         #[cfg(feature = "opd")]
         app.add_asset_loader(OpdLoader);
+        app.add_asset_loader(WpoLoader);
 
         app.add_plugins((
             RenderAssetPlugin::<PointCloudAsset>::with_prepare_asset_set(

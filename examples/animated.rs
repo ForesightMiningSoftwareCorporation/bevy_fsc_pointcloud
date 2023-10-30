@@ -36,7 +36,7 @@ fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
             Vec3::Y,
         ));
 
-    let point_cloud: Handle<PointCloudAsset> = asset_server.load("replay.opd");
+    let point_cloud: Handle<PointCloudAsset> = asset_server.load("replay.wpo");
 
     commands
         .spawn(PotreePointCloud {

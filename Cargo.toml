@@ -19,6 +19,7 @@ opd-parser = { version = "0.3.0", optional = true }
 anyhow = "1"
 las = { version = "0.8", features = ["laz"], optional = true }
 bytemuck = "1.13.1"
+orica_physics_replay = { version = "*", path = "../orica_libs/orica_physics/crates/orica_physics_replay" }
 
 [dev-dependencies]
 smooth-bevy-cameras = "0.9"
