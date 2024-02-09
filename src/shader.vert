@@ -114,6 +114,6 @@ void main() {
     }
     point_size.x *= view.viewport.w / view.viewport.z;
 
-    out_Point_Location = in_Position_Point;
-    gl_Position = out_Pos + vec4(in_Position_Point * point_size, 0.0, 0.0);
+    out_Point_Location = in_Position_Point - 0.5;
+    gl_Position = out_Pos + vec4((in_Position_Point - 0.5) * point_size, 0.0, 0.0);
 }

@@ -101,6 +101,7 @@ pub(crate) fn queue_point_cloud_bind_group(
     }
 }
 
+// this is not just used for the points, it doubles as a fullscreen quad. do not change
 const QUAD_VERTEX_BUF: &[f32] = &[0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
 
 impl FromWorld for PointCloudPipeline {
