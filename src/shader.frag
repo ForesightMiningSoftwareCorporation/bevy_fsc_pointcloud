@@ -16,7 +16,11 @@ layout(set = 2, binding = 0) uniform Model {
 void main()
 {
     vec2 uv = in_Point_Location * 2.0 - 1.0;
-    float depth_offset = sqrt(uv.x * uv.x + uv.y * uv.y);
+    float d = dot(uv, uv);
+    if (d > 1.0) {
+        discard;
+    }
+    float depth_offset = 1.0 - sqrt(1.0 - d);
     o_Target = vec4(in_Color, 1.0);
 
 
