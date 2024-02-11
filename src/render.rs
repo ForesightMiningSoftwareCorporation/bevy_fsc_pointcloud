@@ -1,30 +1,28 @@
 use crate::{pipeline::PointCloudPipeline, PointCloudAsset};
 use crate::{PointCloudPipelineKey, ATTRIBUTE_COLOR};
-use bevy::render::render_asset::RenderAssets;
-use bevy::render::render_resource::{
-    BufferDescriptor, CachedRenderPipelineId, PipelineCache, SpecializedRenderPipelines,
-};
-use bevy::render::renderer::RenderQueue;
-use bevy::render::view::VisibleEntities;
 use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     prelude::*,
     render::{
-        render_asset::RenderAsset,
+        render_asset::{RenderAsset, RenderAssetUsages, RenderAssets},
         render_resource::{
-            BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferInitDescriptor,
-            BufferUsages, ShaderType,
+            BindGroup, BindGroupEntry, Buffer, BufferDescriptor, BufferInitDescriptor,
+            BufferUsages, CachedRenderPipelineId, PipelineCache, ShaderType,
+            SpecializedRenderPipelines,
         },
-        renderer::RenderDevice,
+        renderer::{RenderDevice, RenderQueue},
+        view::VisibleEntities,
         Extract,
     },
 };
 use opd_parser::Frames;
+
 #[derive(Component, Clone)]
 pub struct PotreePointCloud {
     pub mesh: Handle<PointCloudAsset>,
     pub point_size: f32,
 }
+
 #[derive(Component, Clone, ShaderType)]
 pub struct PointCloudUniform {
     pub transform: Mat4,
@@ -64,6 +62,7 @@ pub struct PointCloudDrawData {
     pub pipeline_id: CachedRenderPipelineId,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn queue_point_cloud(
     pipeline: Res<PointCloudPipeline>,
     mut pipelines: ResMut<SpecializedRenderPipelines<PointCloudPipeline>>,
@@ -258,49 +257,36 @@ impl PreparedPointCloudAsset {
                 resource: next.as_entire_binding(),
             });
         }
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            label: "point cloud buffer bind group".into(),
-            layout: if self.animation_buffer.is_some() {
+        let bind_group = render_device.create_bind_group(
+            "point_cloud_buffer_bind_group",
+            if self.animation_buffer.is_some() {
                 &pipeline.animated_entity_layout
             } else {
                 &pipeline.entity_layout
             },
-            entries: &bind_group_entires,
-        });
+            &bind_group_entires,
+        );
         self.bind_group = Some(bind_group);
     }
 }
 
 impl RenderAsset for PointCloudAsset {
-    type ExtractedAsset = Self;
-
     type PreparedAsset = PreparedPointCloudAsset;
 
     type Param = (SRes<RenderDevice>, SRes<PointCloudPipeline>);
 
-    fn extract_asset(&self) -> Self::ExtractedAsset {
-        self.clone()
-    }
-
     fn prepare_asset(
-        extracted_asset: Self::ExtractedAsset,
+        self,
         (render_device, pipeline): &mut SystemParamItem<Self::Param>,
-    ) -> Result<
-        Self::PreparedAsset,
-        bevy::render::render_asset::PrepareAssetError<Self::ExtractedAsset>,
-    > {
+    ) -> Result<Self::PreparedAsset, bevy::render::render_asset::PrepareAssetError<Self>> {
         let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
             usage: BufferUsages::STORAGE,
-            label: Some("Point cloud vertex buffer"),
-            contents: extracted_asset.mesh.get_vertex_buffer_data().as_slice(),
+            label: Some("point_cloud_vertex_buffer"),
+            contents: self.mesh.get_vertex_buffer_data().as_slice(),
         });
 
-        let animation_buffer = if extracted_asset.animation.is_some() {
-            let size = extracted_asset
-                .mesh
-                .attribute(Mesh::ATTRIBUTE_POSITION)
-                .unwrap()
-                .len() as u64
+        let animation_buffer = if self.animation.is_some() {
+            let size = self.mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len() as u64
                 * std::mem::size_of::<f32>() as u64
                 * 3
                 + std::mem::size_of::<f32>() as u64;
@@ -322,17 +308,21 @@ impl RenderAsset for PointCloudAsset {
         };
         let mut asset = PreparedPointCloudAsset {
             buffer,
-            num_points: extracted_asset.mesh.count_vertices() as u32,
+            num_points: self.mesh.count_vertices() as u32,
             bind_group: None,
             animation_buffer,
-            frames: extracted_asset.animation,
+            frames: self.animation,
             current_animation_frame: 0,
             animation_time: 0.0,
             animation_frame_start_time: 0.0,
-            animation_scale: extracted_asset.animation_scale,
-            colored: extracted_asset.mesh.contains_attribute(ATTRIBUTE_COLOR),
+            animation_scale: self.animation_scale,
+            colored: self.mesh.contains_attribute(ATTRIBUTE_COLOR),
         };
         asset.update_bind_group(render_device, pipeline);
         Ok(asset)
+    }
+
+    fn asset_usage(&self) -> RenderAssetUsages {
+        RenderAssetUsages::all()
     }
 }

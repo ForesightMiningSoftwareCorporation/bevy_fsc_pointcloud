@@ -1,13 +1,20 @@
 use crate::PointCloudAsset;
-use bevy::asset::LoadedAsset;
-use bevy::math::Vec3A;
-use bevy::render::render_resource::PrimitiveTopology;
-use bevy::{asset::AssetLoader, prelude::Mesh};
+use bevy::{
+    asset::{io::Reader, AssetLoader, AsyncReadExt, LoadContext},
+    math::Vec3A,
+    prelude::*,
+    render::{render_asset::RenderAssetUsages, render_resource::PrimitiveTopology},
+    utils::{thiserror, BoxedFuture},
+};
+use thiserror::Error;
 
+#[derive(Default)]
 pub struct OpdLoader;
 
 impl OpdLoader {
-    pub async fn load_opd(bytes: &[u8]) -> Result<PointCloudAsset, anyhow::Error> {
+    pub async fn load_opd(
+        bytes: &[u8],
+    ) -> Result<PointCloudAsset, nom::Err<nom::error::Error<Vec<u8>>>> {
         let file = opd_parser::parse(bytes).map_err(|e| e.to_owned())?.1;
         let mut positions: Vec<Vec3A> = Vec::new();
 
@@ -26,9 +33,11 @@ impl OpdLoader {
             *position -= position_offset;
         }
 
-        let mut mesh = Mesh::new(PrimitiveTopology::PointList);
+        let mut mesh = Mesh::new(PrimitiveTopology::PointList, RenderAssetUsages::all());
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-
+        if let opd_parser::Frames::I8(frames) = &file.frames {
+            dbg!(frames.len());
+        }
         Ok(PointCloudAsset {
             mesh,
             animation: Some(file.frames),
@@ -37,19 +46,37 @@ impl OpdLoader {
     }
 }
 
+/// Possible errors that can be produced by [`OpdLoader`]
+#[non_exhaustive]
+#[derive(Debug, Error)]
+pub enum OpdLoaderError {
+    #[error("Could not load asset: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Could not parse Opd: {0}")]
+    OpdParseError(#[from] nom::Err<nom::error::Error<Vec<u8>>>),
+}
+
 impl AssetLoader for OpdLoader {
+    type Asset = PointCloudAsset;
+    type Settings = ();
+    type Error = OpdLoaderError;
+
     fn extensions(&self) -> &[&str] {
         &["opd"]
     }
+
     fn load<'a>(
         &'a self,
-        bytes: &'a [u8],
-        load_context: &'a mut bevy::asset::LoadContext,
-    ) -> bevy::utils::BoxedFuture<'a, Result<(), bevy::asset::Error>> {
+        reader: &'a mut Reader,
+        _settings: &'a (),
+        _load_context: &'a mut LoadContext,
+    ) -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
         Box::pin(async move {
-            let asset = Self::load_opd(bytes).await?;
-            load_context.set_default_asset(LoadedAsset::new(asset));
-            Ok(())
+            let mut bytes = Vec::new();
+            reader.read_to_end(&mut bytes).await?;
+            let asset = Self::load_opd(bytes.as_slice()).await?;
+            //load_context.set_default_asset(LoadedAsset::new(asset));
+            Ok(asset)
         })
     }
 }

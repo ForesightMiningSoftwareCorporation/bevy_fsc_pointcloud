@@ -5,16 +5,17 @@ mod las_loader;
 mod opd_loader;
 mod pipeline;
 mod playback;
+mod point_cloud;
 mod render;
 mod render_graph;
 use bevy::{
     asset::load_internal_asset,
-    core_pipeline::core_3d::CORE_3D,
+    core_pipeline::core_3d::graph::{Labels3d::EndMainPass, SubGraph3d},
     prelude::*,
     render::{
         extract_component::UniformComponentPlugin,
         extract_resource::ExtractResourcePlugin,
-        render_asset::{PrepareAssetSet, RenderAssetPlugin},
+        render_asset::RenderAssetPlugin,
         render_graph::{RenderGraphApp, ViewNodeRunner},
         render_resource::{ShaderStage, SpecializedRenderPipelines},
         Render, RenderApp, RenderSet,
@@ -27,6 +28,7 @@ pub use las_loader::*;
 pub use opd_loader::*;
 pub use pipeline::*;
 pub use playback::*;
+pub use point_cloud::*;
 pub use render::*;
 pub use render_graph::*;
 
@@ -35,17 +37,15 @@ pub struct PointCloudPlugin;
 
 impl Plugin for PointCloudPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_asset::<PointCloudAsset>();
+        app.init_asset::<PointCloudAsset>();
 
         #[cfg(feature = "las")]
-        app.add_asset_loader(LasLoader);
+        app.init_asset_loader::<LasLoader>();
         #[cfg(feature = "opd")]
-        app.add_asset_loader(OpdLoader);
+        app.init_asset_loader::<OpdLoader>();
 
         app.add_plugins((
-            RenderAssetPlugin::<PointCloudAsset>::with_prepare_asset_set(
-                PrepareAssetSet::AssetPrepare,
-            ),
+            RenderAssetPlugin::<PointCloudAsset>::default(),
             UniformComponentPlugin::<PointCloudUniform>::default(),
             ExtractResourcePlugin::<PointCloudPlaybackControls>::default(),
         ))
@@ -101,12 +101,8 @@ impl Plugin for PointCloudPlugin {
             .init_resource::<PointCloudPlaybackControls>();
 
         render_app
-            .add_render_graph_node::<ViewNodeRunner<PointCloudNode>>(CORE_3D, PointCloudNode::NAME)
-            .add_render_graph_edge(
-                CORE_3D,
-                bevy::core_pipeline::core_3d::graph::node::END_MAIN_PASS,
-                PointCloudNode::NAME,
-            );
+            .add_render_graph_node::<ViewNodeRunner<PointCloudNode>>(SubGraph3d, PointCloudLabel)
+            .add_render_graph_edge(SubGraph3d, EndMainPass, PointCloudLabel);
     }
 
     fn finish(&self, app: &mut App) {

@@ -1,6 +1,6 @@
 #version 450
 
-#import bevy_render::view View
+#import bevy_render::view::View
 
 layout(location = 0) in vec2 in_Position_Point;
 
@@ -100,7 +100,7 @@ void main() {
 
 
     vec2 point_size = vec2(0.0, 0.0);
-    if (view.projection[2][3] == -1.0) {
+    if (view.projection[3][3] != 1.0) {
         // perspective projection
         float depth = out_Pos.w;
         float one_over_slope = view.projection[1][1]; // (0.5 * fov_y_radians).tan()
@@ -112,8 +112,8 @@ void main() {
         float max_scale = max(abs(a), abs(b));
         point_size = vec2(point_size_world_space / max_scale);
     }
-    point_size.y *= view.viewport.z / view.viewport.w;
+    point_size.x *= view.viewport.w / view.viewport.z;
 
-    out_Point_Location = in_Position_Point;
-    gl_Position = out_Pos + vec4(in_Position_Point * point_size, 0.0, 0.0);
+    out_Point_Location = in_Position_Point - 0.5;
+    gl_Position = out_Pos + vec4((in_Position_Point - 0.5) * point_size, 0.0, 0.0);
 }

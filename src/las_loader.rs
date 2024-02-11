@@ -1,14 +1,17 @@
 use bevy::{
-    asset::{AssetLoader, LoadedAsset},
+    asset::{io::Reader, AssetLoader, AsyncReadExt, LoadContext},
     prelude::*,
-    reflect::{TypePath, TypeUuid},
     render::{
         mesh::MeshVertexAttribute,
+        render_asset::RenderAssetUsages,
         render_resource::{PrimitiveTopology, VertexFormat},
     },
+    utils::thiserror,
 };
 use las::Read;
-use opd_parser::Frames;
+use thiserror::Error;
+
+use crate::PointCloudAsset;
 
 pub const ATTRIBUTE_COLOR: MeshVertexAttribute =
     MeshVertexAttribute::new("Vertex_Color", 1, VertexFormat::Float32x3);
@@ -43,34 +46,38 @@ impl Point {
     }
 }
 
-#[derive(TypeUuid, Clone, TypePath)]
-#[uuid = "806a9a3b-04db-4e4e-b509-ab35ef3a6c43"]
-pub struct PointCloudAsset {
-    pub mesh: Mesh,
-    pub animation: Option<Frames>,
-    pub animation_scale: Vec3,
+/// Possible errors that can be produced by [`LasLoader`]
+#[non_exhaustive]
+#[derive(Debug, Error)]
+pub enum LasLoaderError {
+    #[error("Could not load asset: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Could not parse Las: {0}")]
+    RonSpannedError(#[from] las::Error),
 }
 
-impl PointCloudAsset {
-    pub fn animation_duration(&self) -> Option<f32> {
-        match &self.animation {
-            Some(Frames::I8(frames)) => Some(frames.last().unwrap().time / 1000.),
-            _ => None,
-        }
-    }
-}
-
+#[derive(Default)]
 pub struct LasLoader;
 impl AssetLoader for LasLoader {
+    type Asset = PointCloudAsset;
+    type Settings = ();
+    type Error = LasLoaderError;
+
+    fn extensions(&self) -> &[&str] {
+        &["las", "laz"]
+    }
+
     fn load<'a>(
         &'a self,
-        bytes: &'a [u8],
-        load_context: &'a mut bevy::asset::LoadContext,
-    ) -> bevy::utils::BoxedFuture<'a, Result<(), bevy::asset::Error>> {
+        reader: &'a mut Reader,
+        _settings: &'a (),
+        _load_context: &'a mut LoadContext,
+    ) -> bevy::utils::BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
         Box::pin(async move {
-            let mut reader =
-                las::Reader::new(std::io::Cursor::new(bytes)).expect("Unable to open reader");
-            let mut mesh = Mesh::new(PrimitiveTopology::PointList);
+            let mut bytes = Vec::new();
+            reader.read_to_end(&mut bytes).await?;
+            let mut reader = las::Reader::new(std::io::Cursor::new(bytes))?;
+            let mut mesh = Mesh::new(PrimitiveTopology::PointList, RenderAssetUsages::all());
             let mut max: Point = [f32::MIN; 3].into();
             let mut min: Point = [f32::MAX; 3].into();
             let (mut positions, colors): (Vec<_>, Vec<_>) = reader
@@ -121,11 +128,8 @@ impl AssetLoader for LasLoader {
                 animation: None,
                 animation_scale: Vec3::default(),
             };
-            load_context.set_default_asset(LoadedAsset::new(asset));
-            Ok(())
+            //load_context.set_default_asset(LoadedAsset::new(asset));
+            Ok(asset)
         })
-    }
-    fn extensions(&self) -> &[&str] {
-        &["las", "laz"]
     }
 }

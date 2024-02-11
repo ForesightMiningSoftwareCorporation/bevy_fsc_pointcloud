@@ -1,26 +1,29 @@
 use crate::pipeline::{EyeDomeViewTarget, PointCloudBindGroup, PointCloudPipeline};
 use crate::{PointCloudAsset, PointCloudDrawList, PointCloudUniform};
-use bevy::ecs::query::QueryItem;
-use bevy::prelude::*;
-use bevy::render::camera::ExtractedCamera;
-use bevy::render::extract_component::DynamicUniformIndex;
-use bevy::render::render_asset::RenderAssets;
-use bevy::render::render_graph::ViewNode;
-use bevy::render::render_resource::{
-    LoadOp, Operations, PipelineCache, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor, ShaderStages,
+use bevy::{
+    ecs::query::QueryItem,
+    prelude::*,
+    render::{
+        camera::ExtractedCamera,
+        extract_component::DynamicUniformIndex,
+        render_asset::RenderAssets,
+        render_graph::{RenderLabel, ViewNode},
+        render_resource::{
+            LoadOp, Operations, PipelineCache, RenderPassColorAttachment,
+            RenderPassDepthStencilAttachment, RenderPassDescriptor, ShaderStages, StoreOp,
+        },
+        view::{ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset},
+    },
 };
-use bevy::render::view::{ExtractedView, ViewDepthTexture, ViewTarget, ViewUniformOffset};
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+pub struct PointCloudLabel;
 
 pub struct PointCloudNode {
     entity_query: QueryState<(
         &'static Handle<PointCloudAsset>,
         &'static DynamicUniformIndex<PointCloudUniform>,
     )>,
-}
-
-impl PointCloudNode {
-    pub const NAME: &'static str = "point_cloud_node";
 }
 
 impl FromWorld for PointCloudNode {
@@ -62,29 +65,28 @@ impl ViewNode for PointCloudNode {
             // NOTE: The opaque pass loads the color
             // buffer as well as writing to it.
             color_attachments: &[
-                Some(target.get_color_attachment(Operations {
-                    load: LoadOp::Load,
-                    store: true,
-                })),
+                Some(target.get_color_attachment()),
                 Some(RenderPassColorAttachment {
                     view: &eye_dome_view_target.depth_texture_view,
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(Color::BLACK.into()),
-                        store: true,
+                        store: StoreOp::Store,
                     },
                 }),
             ],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                view: &depth.view,
+                view: depth.view(),
                 // NOTE: The opaque main pass loads the depth buffer and possibly overwrites it
                 depth_ops: Some(Operations {
                     // NOTE: 0.0 is the far plane due to bevy's use of reverse-z projections.
                     load: LoadOp::Load,
-                    store: true,
+                    store: StoreOp::Store,
                 }),
                 stencil_ops: None,
             }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
         });
         if let Some(viewport) = camera.viewport.as_ref() {
             tracked_pass.set_camera_viewport(viewport);
@@ -135,11 +137,10 @@ impl ViewNode for PointCloudNode {
             label: Some("eye_dome_lighting"),
             // NOTE: The opaque pass loads the color
             // buffer as well as writing to it.
-            color_attachments: &[Some(target.get_color_attachment(Operations {
-                load: LoadOp::Load,
-                store: true,
-            }))],
+            color_attachments: &[Some(target.get_color_attachment())],
             depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         });
         if let Some(viewport) = camera.viewport.as_ref() {
             tracked_pass.set_camera_viewport(viewport);
