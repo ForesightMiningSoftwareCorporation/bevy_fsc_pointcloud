@@ -2,7 +2,8 @@ use crate::{pipeline::PointCloudPipeline, PointCloudAsset};
 use crate::{PointCloudPipelineKey, ATTRIBUTE_COLOR};
 use bevy::render::render_asset::RenderAssets;
 use bevy::render::render_resource::{
-    BufferDescriptor, CachedRenderPipelineId, PipelineCache, SpecializedRenderPipelines,
+    BufferDescriptor, CachedRenderPipelineId, DynamicBindGroupEntries, PipelineCache,
+    SpecializedRenderPipelines,
 };
 use bevy::render::renderer::RenderQueue;
 use bevy::render::view::VisibleEntities;
@@ -11,10 +12,7 @@ use bevy::{
     prelude::*,
     render::{
         render_asset::RenderAsset,
-        render_resource::{
-            BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer, BufferInitDescriptor,
-            BufferUsages, ShaderType,
-        },
+        render_resource::{BindGroup, Buffer, BufferInitDescriptor, BufferUsages, ShaderType},
         renderer::RenderDevice,
         Extract,
     },
@@ -244,29 +242,23 @@ impl PreparedPointCloudAsset {
         render_device: &RenderDevice,
         pipeline: &PointCloudPipeline,
     ) {
-        let mut bind_group_entires = vec![BindGroupEntry {
-            binding: 0,
-            resource: self.buffer.as_entire_binding(),
-        }];
+        let mut bind_group_entries =
+            DynamicBindGroupEntries::sequential((self.buffer.as_entire_binding(),));
         if let Some((animation_buffer, next)) = self.animation_buffer.as_ref() {
-            bind_group_entires.push(BindGroupEntry {
-                binding: 1,
-                resource: animation_buffer.as_entire_binding(),
-            });
-            bind_group_entires.push(BindGroupEntry {
-                binding: 2,
-                resource: next.as_entire_binding(),
-            });
+            bind_group_entries = bind_group_entries.extend_sequential((
+                animation_buffer.as_entire_binding(),
+                next.as_entire_binding(),
+            ));
         }
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            label: "point cloud buffer bind group".into(),
-            layout: if self.animation_buffer.is_some() {
+        let bind_group = render_device.create_bind_group(
+            "point cloud buffer bind group",
+            if self.animation_buffer.is_some() {
                 &pipeline.animated_entity_layout
             } else {
                 &pipeline.entity_layout
             },
-            entries: &bind_group_entires,
-        });
+            &bind_group_entries,
+        );
         self.bind_group = Some(bind_group);
     }
 }

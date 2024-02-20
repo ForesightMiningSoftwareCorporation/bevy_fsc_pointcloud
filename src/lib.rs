@@ -14,7 +14,7 @@ use bevy::{
     render::{
         extract_component::UniformComponentPlugin,
         extract_resource::ExtractResourcePlugin,
-        render_asset::{PrepareAssetSet, RenderAssetPlugin},
+        render_asset::RenderAssetPlugin,
         render_graph::{RenderGraphApp, ViewNodeRunner},
         render_resource::{ShaderStage, SpecializedRenderPipelines},
         Render, RenderApp, RenderSet,
@@ -35,17 +35,15 @@ pub struct PointCloudPlugin;
 
 impl Plugin for PointCloudPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_asset::<PointCloudAsset>();
+        app.init_asset::<PointCloudAsset>();
 
         #[cfg(feature = "las")]
-        app.add_asset_loader(LasLoader);
+        app.init_asset_loader::<LasLoader>();
         #[cfg(feature = "opd")]
-        app.add_asset_loader(OpdLoader);
+        app.init_asset_loader::<OpdLoader>();
 
         app.add_plugins((
-            RenderAssetPlugin::<PointCloudAsset>::with_prepare_asset_set(
-                PrepareAssetSet::AssetPrepare,
-            ),
+            RenderAssetPlugin::<PointCloudAsset>::default(),
             UniformComponentPlugin::<PointCloudUniform>::default(),
             ExtractResourcePlugin::<PointCloudPlaybackControls>::default(),
         ))
