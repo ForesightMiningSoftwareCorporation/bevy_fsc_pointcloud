@@ -1,6 +1,5 @@
 use bevy::{
     prelude::*,
-    reflect::TypeUuid,
     render::{
         camera::ExtractedCamera,
         extract_component::ComponentUniforms,
@@ -19,12 +18,12 @@ use crate::{
     PointCloudPlaybackControls, PointCloudUniform,
 };
 
-pub(crate) const POINT_CLOUD_VERT_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf01);
-pub(crate) const POINT_CLOUD_FRAG_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf02);
-pub(crate) const EYE_DOME_LIGHTING_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 0x3fc9d1ff70cedf03);
+pub(crate) const POINT_CLOUD_VERT_SHADER_HANDLE: Handle<Shader> =
+    Handle::weak_from_u128(0x3fc9d1ff70cedf01);
+pub(crate) const POINT_CLOUD_FRAG_SHADER_HANDLE: Handle<Shader> =
+    Handle::weak_from_u128(0x3fc9d1ff70cedf02);
+pub(crate) const EYE_DOME_LIGHTING_SHADER_HANDLE: Handle<Shader> =
+    Handle::weak_from_u128(0x3fc9d1ff70cedf03);
 
 #[derive(Resource)]
 pub struct PointCloudPipeline {
@@ -71,33 +70,20 @@ pub(crate) fn queue_point_cloud_bind_group(
         view_uniform.uniforms.binding(),
         clipping_planes_uniform.0.binding(),
     ) {
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            label: Some("point_cloud_bind_group"),
-            layout: &pipeline.view_layout,
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: view_uniform_resource,
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: clipping_plane_resource,
-                },
-            ],
-        });
+        let bind_group = render_device.create_bind_group(
+            "point_cloud_bind_group",
+            &pipeline.view_layout,
+            &BindGroupEntries::sequential((view_uniform_resource, clipping_plane_resource)),
+        );
         bind_groups.bind_group = Some(bind_group);
     }
 
     if let Some(binding) = model_uniform.uniforms().binding() {
-        bind_groups.model_bind_group =
-            Some(render_device.create_bind_group(&BindGroupDescriptor {
-                entries: &[BindGroupEntry {
-                    binding: 0,
-                    resource: binding,
-                }],
-                label: Some("point_cloud_model_bind_group"),
-                layout: &pipeline.model_layout,
-            }));
+        bind_groups.model_bind_group = Some(render_device.create_bind_group(
+            "point_cloud_model_bind_group",
+            &pipeline.model_layout,
+            &BindGroupEntries::single(binding),
+        ));
     }
 }
 
@@ -231,7 +217,7 @@ impl SpecializedRenderPipeline for PointCloudPipeline {
                 self.model_layout.clone(),
             ],
             vertex: VertexState {
-                shader: POINT_CLOUD_VERT_SHADER_HANDLE.typed(),
+                shader: POINT_CLOUD_VERT_SHADER_HANDLE,
                 shader_defs: {
                     let mut defs = Vec::new();
                     if colored {
@@ -254,7 +240,7 @@ impl SpecializedRenderPipeline for PointCloudPipeline {
                 }],
             },
             fragment: Some(FragmentState {
-                shader: POINT_CLOUD_FRAG_SHADER_HANDLE.typed(),
+                shader: POINT_CLOUD_FRAG_SHADER_HANDLE,
                 shader_defs: {
                     let mut defs = Vec::new();
                     if colored {
@@ -368,7 +354,7 @@ impl SpecializedRenderPipeline for EyeDomePipeline {
                 self.eye_dome_image_layout.clone()
             }],
             vertex: VertexState {
-                shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
+                shader: EYE_DOME_LIGHTING_SHADER_HANDLE,
                 shader_defs: if msaa > 1 {
                     vec!["MULTISAMPLED".into()]
                 } else {
@@ -401,7 +387,7 @@ impl SpecializedRenderPipeline for EyeDomePipeline {
                 alpha_to_coverage_enabled: false,
             },
             fragment: Some(FragmentState {
-                shader: EYE_DOME_LIGHTING_SHADER_HANDLE.typed(),
+                shader: EYE_DOME_LIGHTING_SHADER_HANDLE,
                 shader_defs: if msaa > 1 {
                     vec!["MULTISAMPLED".into()]
                 } else {
@@ -475,20 +461,15 @@ pub(crate) fn queue_view_targets(
                 };
                 let cached_depth_texture = texture_cache.get(&render_device, depth_descriptor);
 
-                let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-                    label: "Eye Dome Bind Group".into(),
-                    layout: if msaa > 1 {
+                let bind_group = render_device.create_bind_group(
+                    "Eye Dome Bind Group",
+                    if msaa > 1 {
                         &eye_dome_pipeline.multisampled_eye_dome_image_layout
                     } else {
                         &eye_dome_pipeline.eye_dome_image_layout
                     },
-                    entries: &[BindGroupEntry {
-                        binding: 0,
-                        resource: bevy::render::render_resource::BindingResource::TextureView(
-                            &cached_depth_texture.default_view,
-                        ),
-                    }],
-                });
+                    &BindGroupEntries::single(&cached_depth_texture.default_view),
+                );
                 EyeDomeViewTarget {
                     depth_texture: cached_depth_texture.texture,
                     depth_texture_view: cached_depth_texture.default_view,
@@ -523,7 +504,11 @@ pub fn prepare_animated_assets(
 ) {
     for (handle, asset) in assets.iter_mut() {
         if asset.animation_buffer.is_some() {
-            let playback = playback.controls.get(handle).copied().unwrap_or_default();
+            let playback = playback
+                .controls
+                .get(&Handle::Weak(handle))
+                .copied()
+                .unwrap_or_default();
             if playback.time != asset.animation_time {
                 asset.seek(playback.time, &queue, &render_device, &pipeline);
             }

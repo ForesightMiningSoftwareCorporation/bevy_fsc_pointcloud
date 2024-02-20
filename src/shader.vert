@@ -1,6 +1,6 @@
 #version 450
 
-#import bevy_render::view View
+#import bevy_render::view::View
 
 layout(location = 0) in vec2 in_Position_Point;
 

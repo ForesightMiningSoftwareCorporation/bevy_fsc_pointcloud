@@ -1,6 +1,6 @@
 #version 450
 
-#import bevy_render::view View
+#import bevy_render::view::View
 
 layout(location = 0) out vec4 o_Target;
 layout(location = 1) out float o_Depth;
@@ -21,7 +21,7 @@ void main()
 
 
     float depth = 1.0 / gl_FragCoord.w; // the world space depth
-    
+
     if (view.projection[2][3] != -1.0) {
         // orthographic projection
         // projection[2][2] is r = 1.0 / (near - far).

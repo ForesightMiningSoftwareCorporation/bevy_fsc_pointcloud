@@ -45,8 +45,13 @@ impl PointCloudPlaybackControls {
             .bypass_change_detection()
             .controls
             .retain(|handle, controls| {
-                let Some(asset) = assets.get(handle) else { return false }; // remove if asset doesn't exist
-                let Some(animation_duration) = asset.animation_duration() else { return false }; // remove if asset isn't animated
+                let Some(animation_duration) = assets
+                    .get(handle)
+                    .and_then(|asset| asset.animation_duration())
+                else {
+                    // remove if asset doesn't exist or isn't animated
+                    return false;
+                };
 
                 if controls.playing {
                     changed |= true;
